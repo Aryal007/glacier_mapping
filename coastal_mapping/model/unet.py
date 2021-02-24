@@ -20,10 +20,14 @@ class ConvBlock(nn.Module):
     Transforms large image with small inchannels into smaller image with larger
     outchannels, via two convolution / relu pairs.
     """
-    def __init__(self, inchannels, outchannels, kernel_size=3, padding=1):
+    def __init__(self, inchannels, outchannels, dropout, spatial, kernel_size=3, padding=1):
         super().__init__()
         self.conv1 = nn.Conv2d(inchannels, outchannels, kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv2d(outchannels, outchannels, kernel_size=kernel_size, padding=padding)
+        if spatial:
+            self.dropout = nn.Dropout2d(p=dropout)
+        else:
+            self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -38,12 +42,12 @@ class UpBlock(nn.Module):
     Transforms small image with large inchannels into larger image with smaller
     outchannels, via two convolution / relu pairs.
     """
-    def __init__(self, inchannels, outchannels, kernel_size=2, stride=2):
+    def __init__(self, inchannels, outchannels, dropout, spatial, kernel_size=2, stride=2):
         super().__init__()
         self.upconv = nn.ConvTranspose2d(
             inchannels, outchannels, kernel_size=kernel_size, stride=stride
         )
-        self.conv = ConvBlock(inchannels, outchannels)
+        self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
 
     def forward(self, x, skips):
         x = self.upconv(x)
@@ -58,24 +62,24 @@ class Unet(nn.Module):
     Combines the encoder and decoder blocks with skip connections, to arrive at
     a U-Net model.
     """
-    def __init__(self, inchannels, outchannels, net_depth, channel_layer=16):
+    def __init__(self, inchannels, outchannels, net_depth, dropout = 0.2, spatial = False, first_channel_output=16):
         super().__init__()
         self.downblocks = nn.ModuleList()
         self.upblocks = nn.ModuleList()
         self.pool = nn.MaxPool2d(2, 2)
 
         in_channels = inchannels
-        out_channels = channel_layer
+        out_channels = first_channel_output
         for _ in range(net_depth):
-            conv = ConvBlock(in_channels, out_channels)
+            conv = ConvBlock(in_channels, out_channels, dropout, spatial)
             self.downblocks.append(conv)
             in_channels, out_channels = out_channels, 2 * out_channels
 
-        self.middle_conv = ConvBlock(in_channels, out_channels)
+        self.middle_conv = ConvBlock(in_channels, out_channels, dropout, spatial)
 
         in_channels, out_channels = out_channels, int(out_channels / 2)
         for _ in range(net_depth):
-            upconv = UpBlock(in_channels, out_channels)
+            upconv = UpBlock(in_channels, out_channels, dropout, spatial)
             self.upblocks.append(upconv)
             in_channels, out_channels = out_channels, int(out_channels / 2)
 

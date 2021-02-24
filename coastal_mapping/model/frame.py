@@ -4,21 +4,19 @@
 Created on Fri Sep  4 22:59:16 2020
 
 @author: mibook
-#!/usr/bin/env python
+
 Frame to Combine Model with Optimizer
 
 This wraps the model and optimizer objects needed in training, so that each
 training step can be concisely called with a single method.
 """
 from pathlib import Path
-import os
 import torch
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import os
 from .metrics import *
-from .reg import *
-from ..model.unet import *
-
+from .unet import *
 
 class Framework:
     """
@@ -27,13 +25,21 @@ class Framework:
     """
 
     def __init__(self, loss_fn=None, model_opts=None, optimizer_opts=None,
-                 reg_opts=None,):
+                 reg_opts=None, device=None):
         """
         Set Class Attrributes
         """
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
+        self.multi_class = True if model_opts.args.outchannels > 1 else False
+        self.num_classes = model_opts.args.outchannels    
         if loss_fn is None:
-            loss_fn = torch.nn.BCEWithLogitsLoss()
+            if self.multi_class:
+                loss_fn = torch.nn.CrossEntropyLoss()
+            else:
+                loss_fn = torch.nn.BCEWithLogitsLoss()
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
         optimizer_def = getattr(torch.optim, optimizer_opts.name)
@@ -59,6 +65,7 @@ class Framework:
 
         self.optimizer.zero_grad()
         y_hat = self.model(x)
+        
         loss = self.calc_loss(y_hat, y)
         loss.backward()
         self.optimizer.step()
@@ -144,4 +151,33 @@ class Framework:
                 metric_fun = globals()[k]
                 metric_value = metric_fun(y_hat, y)
             results[k] = np.mean(np.asarray(metric_value))
+            
         return results
+    
+    def segment(self, y_hat):
+        """Predict a class given logits
+        Args:
+            y_hat: logits output
+        Return:
+            Probability of class in case of binary classification
+            or one-hot tensor in case of multi class"""
+        if self.multi_class:
+            y_hat = torch.argmax(y_hat, axis=3)
+            y_hat = torch.nn.functional.one_hot(y_hat, num_classes=self.num_classes)
+        else:
+            y_hat = torch.sigmoid(y_hat)
+            
+        return y_hat
+    
+    def act(self, logits):
+        """Applies activation function based on the model
+        Args:
+            y_hat: logits output
+        Returns:
+            logits after applying activation function"""
+
+        if self.multi_class:
+            y_hat = torch.nn.Softmax(3)(logits)
+        else:
+            y_hat = torch.sigmoid(logits)
+        return y_hat

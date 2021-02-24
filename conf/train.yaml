@@ -1,0 +1,22 @@
+data_dir: "/home/mibook/Desktop/Spring 2021/CoastalMapping/data"
+batch_size: 2
+run_name: "demo"
+epochs: 150
+save_every: 50
+loss_type: "dice"
+model_opts:
+  args: 
+    inchannels: 15
+    outchannels: 3
+    net_depth: 5
+    dropout: 0.3
+    spatial: True
+    first_channel_output: 8
+optim_opts:
+  name: "Adam"
+  args:
+    lr: 0.0001
+log_opts:
+  mask_names: ["Clean Ice", "Debris", "Background"]
+  reg_opts:
+    l1_reg: 0.0005
