@@ -33,8 +33,8 @@ def train_epoch(loader, frame):
       and the metrics on the training set.
     """
     loss = 0
-    frame.model.train()
-    for x, y in loader:
+
+    for x,y in loader:
         y_hat, _loss = frame.optimize(x, y)
         loss += _loss
         y_hat = frame.segment(y_hat)
@@ -124,12 +124,12 @@ def log_images(writer, frame, batch, epoch, stage="train"):
         writer.add_image(f"{stage}/y", make_grid(y.unsqueeze(1)), epoch)
     writer.add_image(f"{stage}/y_hat", make_grid(y_hat.unsqueeze(1)), epoch)
     
-def get_dice_loss(outchannels):
+def get_dice_loss(outchannels, masked):
     if outchannels > 1:
         loss_weight = np.ones(outchannels) / outchannels
         label_smoothing = 0.2
         loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
-                               outchannels=outchannels, label_smoothing=label_smoothing)
+                               outchannels=outchannels, label_smoothing=label_smoothing, masked=masked)
     else:
         loss_fn = diceloss()
     return loss_fn

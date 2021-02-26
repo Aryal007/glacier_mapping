@@ -1,0 +1,9 @@
+image_dir: "/mnt/datadrive/noaa/images/"
+labels_dir: "/mnt/datadrive/noaa/labels/"
+out_dir: "/mnt/datadrive/noaa/processed/"
+window_size: [512,512]
+overlap: 6
+filter: 0.1
+train_split: 0.6 
+val_split: 0.2
+test_split: 0.2

@@ -23,6 +23,7 @@ def fetch_loaders(processed_dir, batch_size=32,
     """
     train_dataset = CoastalDataset(processed_dir / train_folder)
     val_dataset = CoastalDataset(processed_dir / val_folder)
+    
     loader = {
         "train": DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=8, shuffle=shuffle),
@@ -48,8 +49,8 @@ class CoastalDataset(Dataset):
             folder_path(str): A path to data directory
         """
 
-        self.img_files = glob.glob(os.path.join(folder_path, '*img*'))
-        self.mask_files = [s.replace("img", "mask") for s in self.img_files]
+        self.img_files = glob.glob(os.path.join(folder_path, 'tiff*'))
+        self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
 
     def __getitem__(self, index):
 
@@ -63,6 +64,8 @@ class CoastalDataset(Dataset):
         img_path = self.img_files[index]
         mask_path = self.mask_files[index]
         data = np.load(img_path)
+        if data.dtype == "uint16":
+            data = data/255
         label = np.load(mask_path)
 
         return torch.from_numpy(data).float(), torch.from_numpy(label).float()

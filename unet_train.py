@@ -20,7 +20,7 @@ processed_dir = data_dir / "processed"
 loaders = fetch_loaders(processed_dir, conf.batch_size)
 
 if conf.loss_type == "dice":
-    loss_fn = fn.get_dice_loss(conf.model_opts.args.outchannels)    
+    loss_fn = fn.get_dice_loss(conf.model_opts.args.outchannels, conf.loss_masked)    
 else:
     loss_fn = None
     
@@ -38,20 +38,20 @@ out_dir = f"{data_dir}/runs/{conf.run_name}/models/"
 
 for epoch in range(conf.epochs):
     # train loop
-    loss_d = {}
-    loss_d["train"] = fn.train_epoch(loaders["train"], frame)
+    loss = {}
+    loss["train"] = fn.train_epoch(loaders["train"], frame)
     fn.log_images(writer, frame, next(iter(loaders["train"])), epoch)
 
     # validation loop
-    loss_d["val"] = fn.validate(loaders["val"], frame)
+    loss["val"] = fn.validate(loaders["val"], frame)
     fn.log_images(writer, frame, next(iter(loaders["val"])), epoch, "val")
 
     # Save model
-    writer.add_scalars("Loss", loss_d, epoch)
+    writer.add_scalars("Loss", loss, epoch)
     if epoch % conf.save_every == 0:
         frame.save(out_dir, epoch)
 
-    print(f"{epoch+1}/{conf.epochs} | train: {loss_d['train']} | val: {loss_d['val']}")
+    print(f"{epoch+1}/{conf.epochs} | train: {loss['train']} | val: {loss['val']}")
 
 frame.save(out_dir, "final")
 writer.close()

@@ -7,6 +7,8 @@ coastal_mapping
 │
 └─── coastal _mapping
 │   └───data
+│       │   data.py
+│       │   slice.py
 │   └───model
 │       │   frame.py
 │       │   functions.py
@@ -16,7 +18,12 @@ coastal_mapping
 └───data 
 │   
 └───conf
+│   │   slice.yaml
+│   │   train.yaml
 │   
 │   README.md
+│   requirements.txt
+│   slice_and_preprocess.py
+│   unet_train.py
 ```
 

@@ -8,7 +8,7 @@ Created on Fri Sep  4 23:09:33 2020
 metrics and losses
 """
 import torch
-
+import numpy as np
 
 def precision(pred, true, label=1):
     tp = ((pred == label) & (true == label)).sum().item()
@@ -59,16 +59,21 @@ def IoU(pred, true, label=1):
 
 
 class diceloss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
         self.act = act
         self.smooth = smooth
         self.w = w
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
+        self.masked = masked
 
     def forward(self, pred, target):
+        if self.masked:
+            mask = torch.sum(target, dim=1) == 1
+
         pred = self.act(pred)
+        
         if len(self.w) != self.outchannels:
             raise ValueError("Loss weights should be equal to the output channels.")
         # CE expects loss to have arg-max channel. Dice expects it to have one-hot
