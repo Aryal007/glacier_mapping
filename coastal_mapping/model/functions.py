@@ -14,7 +14,7 @@ import numpy as np
 from coastal_mapping.model.metrics import diceloss
 
 
-def train_epoch(loader, frame, metrics_opts):
+def train_epoch(loader, frame, metrics_opts, masked):
     """Train model for one epoch
 
     This makes one pass through a dataloader and updates the model in the
@@ -33,21 +33,23 @@ def train_epoch(loader, frame, metrics_opts):
       and the metrics on the training set.
     """
     loss, metrics = 0, {}
+    batch_size = len(loader)
 
-    for x,y in loader:
+    for i, (x,y) in enumerate(loader):
         y_hat, _loss = frame.optimize(x, y)
         loss += _loss
+        log_batch(i, loss, batch_size)
 
         y_hat = frame.segment(y_hat)
-        metrics_ = frame.metrics(y_hat, y, metrics_opts)
+        metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
         update_metrics(metrics, metrics_)
 
     mean_metrics = agg_metrics(metrics)
         
-    return loss / len(loader.dataset), mean_metric
+    return loss / len(loader.dataset), mean_metrics
 
 
-def validate(loader, frame, metrics_opts):
+def validate(loader, frame, metrics_opts, masked):
     """Compute Metrics on a Validation Loader
 
     To honestly evaluate a model, we should compute its metrics on a validation
@@ -75,7 +77,7 @@ def validate(loader, frame, metrics_opts):
             loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
 
             y_hat = frame.segment(y_hat)
-            metrics_ = frame.metrics(y_hat, y, metrics_opts)
+            metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
             update_metrics(metrics, metrics_)
 
     mean_metrics = agg_metrics(metrics)
@@ -83,24 +85,18 @@ def validate(loader, frame, metrics_opts):
     return loss / len(loader.dataset), mean_metrics
 
 
-def log_batch(epoch, n_epochs, i, n, loss, batch_size):
+def log_batch(i, loss, batch_size):
     """Helper to log a training batch
 
-    :param epoch: Current epoch
-    :type epoch: int
-    :param n_epochs: Total number of epochs
-    :type n_epochs: int
     :param i: Current batch index
     :type i: int
-    :param n: total number of samples
-    :type n: int
     :param loss: current epoch loss
     :type loss: float
     :param batch_size: training batch size
     :type batch_size: int
     """
     print(
-        f"Epoch {epoch}/{n_epochs}, Training batch {i+1} of {int(n) // batch_size}, Loss = {loss/batch_size:.5f}",
+        f"Training batch {i+1} of {batch_size}, Loss = {loss/(i+1):.5f}",
         end="\r",
         flush=True,
     )

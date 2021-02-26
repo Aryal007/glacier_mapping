@@ -12,6 +12,8 @@ import coastal_mapping.model.functions as fn
 from torch.utils.tensorboard import SummaryWriter
 import yaml, json, pathlib
 from addict import Dict
+import warnings
+warnings.filterwarnings("ignore")
 
 conf = Dict(yaml.safe_load(open('./conf/train.yaml')))
 data_dir = data_dir = pathlib.Path(conf.data_dir)
@@ -19,10 +21,8 @@ processed_dir = data_dir / "processed"
 
 loaders = fetch_loaders(processed_dir, conf.batch_size)
 
-if conf.loss_type == "dice":
-    loss_fn = fn.get_dice_loss(conf.model_opts.args.outchannels, conf.loss_masked)    
-else:
-    loss_fn = None
+
+loss_fn = fn.get_dice_loss(conf.model_opts.args.outchannels, conf.loss_masked)    
     
 frame = Framework(
     loss_fn = loss_fn,
@@ -42,12 +42,12 @@ val_batch = next(iter(loaders["val"]))
 for epoch in range(conf.epochs):
     # train loop
     loss = {}
-    loss["train"], train_metric = fn.train_epoch(loaders["train"], frame, conf.metrics_opts)
+    loss["train"], train_metric = fn.train_epoch(loaders["train"], frame, conf.metrics_opts, conf.loss_masked)
     fn.log_metrics(writer, train_metric, epoch+1, "train", conf.log_opts.mask_names)
     fn.log_images(writer, frame, train_batch, epoch, "train")
 
     # validation loop
-    loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts)
+    loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts, conf.loss_masked)
     fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
     fn.log_images(writer, frame, val_batch, epoch, "val")
 

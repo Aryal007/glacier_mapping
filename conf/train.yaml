@@ -1,9 +1,8 @@
 data_dir: "/mnt/datadrive/noaa/"
 batch_size: 16
-run_name: "unmasked_dice"
+run_name: "masked_dice"
 epochs: 150
 save_every: 50
-loss_type: "dice"
 loss_masked: True
 model_opts:
   args: 

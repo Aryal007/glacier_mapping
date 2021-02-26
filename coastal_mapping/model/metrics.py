@@ -63,7 +63,6 @@ def IoU(pred, true, label=1):
     except:
         return 0
 
-
 class diceloss(torch.nn.Module):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
@@ -77,6 +76,9 @@ class diceloss(torch.nn.Module):
     def forward(self, pred, target):
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
+            pred = pred.permute(0, 2, 3, 1)
+            pred[mask] = torch.zeros(pred.shape[3])
+            pred = pred.permute(0, 3, 1, 2)
 
         pred = self.act(pred)
         

@@ -24,7 +24,7 @@ class Framework:
 
     """
 
-    def __init__(self, loss_fn=None, model_opts=None, optimizer_opts=None,
+    def __init__(self, loss_fn, model_opts=None, optimizer_opts=None,
                  reg_opts=None, device=None):
         """
         Set Class Attrributes
@@ -35,11 +35,6 @@ class Framework:
             self.device = device
         self.multi_class = True if model_opts.args.outchannels > 1 else False
         self.num_classes = model_opts.args.outchannels    
-        if loss_fn is None:
-            if self.multi_class:
-                loss_fn = torch.nn.CrossEntropyLoss()
-            else:
-                loss_fn = torch.nn.BCEWithLogitsLoss()
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
         optimizer_def = getattr(torch.optim, optimizer_opts.name)
@@ -128,7 +123,7 @@ class Framework:
         return loss
 
 
-    def metrics(self, y_hat, y, metrics_opts):
+    def metrics(self, y_hat, y, metrics_opts, masked):
         """ Loop over metrics in train.yaml
 
         Args:
@@ -142,6 +137,10 @@ class Framework:
         """
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
+
+        if masked:
+            mask = torch.sum(y, dim=3) == 1
+            y_hat[mask] == torch.zeros(y.shape[3])
 
         results = {}
         for k, metric in metrics_opts.items():
