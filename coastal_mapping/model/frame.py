@@ -146,11 +146,12 @@ class Framework:
         results = {}
         for k, metric in metrics_opts.items():
             if "threshold" in metric.keys():
+                metric_value = torch.zeros(y_hat.shape[3])
                 y_hat = y_hat > metric["threshold"]
-
                 metric_fun = globals()[k]
-                metric_value = metric_fun(y_hat, y)
-            results[k] = np.mean(np.asarray(metric_value))
+                for i in range(y_hat.shape[3]):
+                    metric_value[i] = metric_fun(y_hat[:,:,:,i], y[:,:,:,i])
+            results[k] = metric_value
             
         return results
     

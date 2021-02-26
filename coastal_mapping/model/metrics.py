@@ -47,7 +47,10 @@ def dice(pred, true, label=1):
     fp = ((pred == label) & (true != label)).sum().item()
     fn = ((pred != label) & (true == label)).sum().item()
 
-    return (2 * tp) / (2 * tp + fp + fn)
+    try:
+        return (2 * tp) / (2 * tp + fp + fn)
+    except:
+        return 0
 
 
 def IoU(pred, true, label=1):
@@ -55,7 +58,10 @@ def IoU(pred, true, label=1):
     fp = ((pred == label) & (true != label)).sum().item()
     fn = ((pred != label) & (true == label)).sum().item()
 
-    return tp / (tp + fp + fn)
+    try:
+        return tp / (tp + fp + fn)
+    except:
+        return 0
 
 
 class diceloss(torch.nn.Module):
@@ -89,3 +95,22 @@ class diceloss(torch.nn.Module):
         dice = dice * torch.tensor(self.w).to(device=dice.device)
 
         return dice.sum()
+
+def l1_reg(params, lambda_reg, device):
+    """
+    Compute l^1 penalty for parameters list
+    """
+    penalty = torch.tensor(0.0).to(device)
+    for param in params:
+        penalty += lambda_reg * torch.sum(abs(param))
+    return penalty
+
+
+def l2_reg(params, lambda_reg, device):
+    """
+    Compute l^2 penalty for parameters list
+    """
+    penalty = torch.tensor(0.0).to(device)
+    for param in params:
+        penalty += lambda_reg * torch.norm(param, 2) ** 2
+    return penalty

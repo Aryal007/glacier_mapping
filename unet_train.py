@@ -36,18 +36,23 @@ writer = SummaryWriter(f"{data_dir}/runs/{conf.run_name}/logs/")
 writer.add_text("Configuration Parameters", json.dumps(conf))
 out_dir = f"{data_dir}/runs/{conf.run_name}/models/"
 
+train_batch = next(iter(loaders["train"]))
+val_batch = next(iter(loaders["val"]))
+
 for epoch in range(conf.epochs):
     # train loop
     loss = {}
-    loss["train"] = fn.train_epoch(loaders["train"], frame)
-    fn.log_images(writer, frame, next(iter(loaders["train"])), epoch)
+    loss["train"], train_metric = fn.train_epoch(loaders["train"], frame, conf.metrics_opts)
+    fn.log_metrics(writer, train_metric, epoch+1, "train", conf.log_opts.mask_names)
+    fn.log_images(writer, frame, train_batch, epoch, "train")
 
     # validation loop
-    loss["val"] = fn.validate(loaders["val"], frame)
-    fn.log_images(writer, frame, next(iter(loaders["val"])), epoch, "val")
+    loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts)
+    fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
+    fn.log_images(writer, frame, val_batch, epoch, "val")
 
-    # Save model
     writer.add_scalars("Loss", loss, epoch)
+    # Save model
     if epoch % conf.save_every == 0:
         frame.save(out_dir, epoch)
 

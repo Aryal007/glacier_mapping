@@ -14,7 +14,7 @@ import numpy as np
 from coastal_mapping.model.metrics import diceloss
 
 
-def train_epoch(loader, frame):
+def train_epoch(loader, frame, metrics_opts):
     """Train model for one epoch
 
     This makes one pass through a dataloader and updates the model in the
@@ -32,17 +32,22 @@ def train_epoch(loader, frame):
     :return (train_loss, metrics): A tuple containing the average epoch loss
       and the metrics on the training set.
     """
-    loss = 0
+    loss, metrics = 0, {}
 
     for x,y in loader:
         y_hat, _loss = frame.optimize(x, y)
         loss += _loss
+
         y_hat = frame.segment(y_hat)
+        metrics_ = frame.metrics(y_hat, y, metrics_opts)
+        update_metrics(metrics, metrics_)
+
+    mean_metrics = agg_metrics(metrics)
         
-    return loss / len(loader.dataset)
+    return loss / len(loader.dataset), mean_metric
 
 
-def validate(loader, frame):
+def validate(loader, frame, metrics_opts):
     """Compute Metrics on a Validation Loader
 
     To honestly evaluate a model, we should compute its metrics on a validation
@@ -61,7 +66,7 @@ def validate(loader, frame):
     :return (val_loss, metrics): A tuple containing the average validation loss
       and the metrics on the validation set.
     """
-    loss = 0
+    loss, metrics = 0, {}
     channel_first = lambda x: x.permute(0, 3, 1, 2)
     frame.model.eval()
     for x, y in loader:
@@ -70,8 +75,12 @@ def validate(loader, frame):
             loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
 
             y_hat = frame.segment(y_hat)
+            metrics_ = frame.metrics(y_hat, y, metrics_opts)
+            update_metrics(metrics, metrics_)
+
+    mean_metrics = agg_metrics(metrics)
             
-    return loss / len(loader.dataset)
+    return loss / len(loader.dataset), mean_metrics
 
 
 def log_batch(epoch, n_epochs, i, n, loss, batch_size):
@@ -96,8 +105,22 @@ def log_batch(epoch, n_epochs, i, n, loss, batch_size):
         flush=True,
     )
 
+def log_metrics(writer, metrics, epoch, stage, mask_names=None):
+    """Log metrics for tensorboard
+    A function that logs metrics from training and testing to tensorboard
+    Args:
+        writer(SummaryWriter): The tensorboard summary object
+        metrics(Dict): Dictionary of metrics to record
+        avg_loss(float): The average loss across all epochs
+        epoch(int): Total number of training cycles
+        stage(String): Train/Val
+        mask_names(List): Names of the mask(prediction) to log mmetrics for
+    """
+    for k, v in metrics.items():
+        for name, metric in zip(mask_names, v):
+            writer.add_scalar(f"{name}_{str(k)}/{stage}", metric, epoch)
 
-def log_images(writer, frame, batch, epoch, stage="train"):
+def log_images(writer, frame, batch, epoch, stage):
     """Log images for tensorboard
 
     Args:
@@ -133,3 +156,24 @@ def get_dice_loss(outchannels, masked):
     else:
         loss_fn = diceloss()
     return loss_fn
+
+def update_metrics(main_metrics, batch_metrics):
+    """Append --inplace-- a dict of tensors to another element by element
+       Args:
+            main_metrics (dict(troch.Tensor)): the matrix to append to
+            batch_metrics (dict(troch.Tensor)): the new value to append to main_metrics
+    """
+    for k, v in batch_metrics.items():
+        if k in main_metrics:
+            main_metrics[k] = torch.cat((main_metrics[k], v.unsqueeze(-1)), 1)
+        else:
+            main_metrics[k] = v.unsqueeze(-1)
+
+def agg_metrics(metrics):
+    """Aggregate --inplace-- the mean of a matrix of tensor (across rows)
+       Args:
+            metrics (dict(troch.Tensor)): the matrix to get mean of"""
+    for k, v in metrics.items():
+        metrics[k] = metrics[k].mean(1)
+
+    return metrics
