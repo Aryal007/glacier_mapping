@@ -74,19 +74,17 @@ class diceloss(torch.nn.Module):
         self.masked = masked
 
     def forward(self, pred, target):
-        if self.masked:
-            mask = torch.sum(target, dim=1) == 1
-        
-        pred = self.act(pred).permute(0, 2, 3, 1)
-        target = target.permute(0, 2, 3, 1)
-
         if len(self.w) != self.outchannels:
             raise ValueError("Loss weights should be equal to the output channels.")
         # CE expects loss to have arg-max channel. Dice expects it to have one-hot
         if len(pred.shape) > len(target.shape):
             target = torch.nn.functional.one_hot(target, num_classes=self.outchannels).permute(0, 3, 1, 2)
         target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
+
         if self.masked:
+            mask = torch.sum(target, dim=1) == 1
+            pred = self.act(pred).permute(0, 2, 3, 1)
+            target = target.permute(0, 2, 3, 1)
             intersection = (pred * target)[mask]
             A_sum = (pred * pred)[mask]
             B_sum = (target * target)[mask]
@@ -94,13 +92,11 @@ class diceloss(torch.nn.Module):
             A_sum = A_sum.sum(dim=0)
             B_sum = B_sum.sum(dim=0)
         else:
-            intersection = pred * target
-            A_sum = (pred * pred)
-            B_sum = (target * target)
-            intersection = intersection.sum(dim=[0, 1, 2])
-            A_sum = A_sum.sum(dim=[0, 1, 2])
-            B_sum = B_sum.sum(dim=[0, 1, 2])
-
+            pred = self.act(pred)
+            intersection = (pred * target).sum(dim=[0, 2, 3])
+            A_sum = (pred * pred).sum(dim=[0, 2, 3])
+            B_sum = (target * target).sum(dim=[0, 2, 3])
+            
         union = A_sum + B_sum
         dice = 1 - ((2.0 * intersection + self.smooth) / (union + self.smooth))
         dice = dice * torch.tensor(self.w).to(device=dice.device)

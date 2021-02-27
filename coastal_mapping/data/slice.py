@@ -107,6 +107,8 @@ def get_mask(tiff, shp, column="Id"):
     classes = set(shp[column])
 
     shapefile_crs = rasterio.crs.CRS.from_string(str(shp.crs))
+    print("Here")
+    input()
     if shapefile_crs != tiff.meta["crs"]:
         shp = shp.to_crs(tiff.meta["crs"].data)
     check_crs(tiff.crs, shp.crs)
@@ -153,6 +155,8 @@ def save_slices(filenum, tiff, mask, **conf):
     if not os.path.exists(conf["out_dir"]):
         os.makedirs(conf["out_dir"])
     tiff_np = np.transpose(tiff.read(), (1,2,0))
+    print(tiff_np.shape)
+    input()
 
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):

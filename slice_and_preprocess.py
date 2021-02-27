@@ -9,7 +9,6 @@ import os, yaml
 import numpy
 from addict import Dict
 import coastal_mapping.data.slice as fn
-import matplotlib.pyplot as plt
 
 conf = Dict(yaml.safe_load(open('./conf/slice.yaml')))
 
@@ -19,6 +18,7 @@ tiff_filenames = [x.replace('shp','TIF') for x in label_filenames]
 fn.remove_and_create(conf.out_dir)
 
 for i, (label_filename, tiff_filename) in enumerate(zip(label_filenames, tiff_filenames)):
+    print(label_filename)
     shp = fn.read_shp(conf.labels_dir+label_filename)
     tiff = fn.read_tiff(conf.image_dir+tiff_filename)
     

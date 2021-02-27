@@ -31,6 +31,7 @@ coastal_mapping
 * sudo apt install python3-pip
 * sudo python3 -m pip install -U pip
 * sudo python3 -m pip install -U setuptools
+* sudo apt-get install gdal-bin
 * git clone https://github.com/Aryal007/coastal_mapping.git         Clone Repository
 * cd coastal_mapping                                                Change directory to coastal mapping
 * pip3 install -r requirements.txt                                  Install all the necessary requirements

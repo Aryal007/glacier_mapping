@@ -1,5 +1,5 @@
 data_dir: "/mnt/datadrive/noaa/"
-filename: '2017_NOAA_ANWR_4Band3.TIF'
+filename: '2017_NOAA_ANWR_4Band122.TIF'
 run_name: 'unmasked_dice'
 window_size: [512,512]
 model_opts:

@@ -24,7 +24,7 @@ if __name__ == "__main__":
     conf = Dict(yaml.safe_load(open('./conf/predict.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
     tif_path = data_dir / "images" / conf.filename
-    model_path = data_dir / "runs" / conf.run_name / "models" / "model_final.pt"
+    model_path = data_dir / "test_runs" / conf.run_name / "models" / "model_final.pt"
 
     tiff = rasterio.open(tif_path)
     tiff_np = tiff.read()
@@ -75,5 +75,5 @@ if __name__ == "__main__":
                 endcolumn_dest = y.shape[1]
             y[row:endrow_dest, column:endcolumn_dest] = prediction[0:endrow_source, 0:endcolumn_source]
     
-    plt.imsave("./image.png", np.transpose(tiff_np, (1,2,0))[::20,::20,:3].clip(0,1))
-    plt.imsave("./mask.png", y[::20, ::20]) 
+    plt.imsave("./image.png", np.transpose(tiff_np, (1,2,0))[:,:,:3].clip(0,1))
+    plt.imsave("./mask.png", y) 
