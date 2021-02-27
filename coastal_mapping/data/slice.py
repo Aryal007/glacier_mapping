@@ -134,10 +134,13 @@ def get_mask(tiff, shp, column="Id"):
     return mask
 
 def add_index(tiff_np, index1, index2, comment=None):
-    ndvi = np.zeros((tiff_np.shape[0], tiff_np.shape[1]))
-    ndvi = (tiff_np[:,:,index1]-tiff_np[:,:,index2])/(tiff_np[:,:,index1]+tiff_np[:,:,index2])
-    ndvi = np.nan_to_num(ndvi)
-    tiff_np = np.concatenate((tiff_np, np.expand_dims(ndvi, axis=2)), axis=2)
+    rsi = np.zeros((tiff_np.shape[0], tiff_np.shape[1]))
+    if comment == "ndswi":
+        rsi = (np.log(tiff_np[:,:,index1]) - np.log(tiff_np[:,:,index2])) / (np.log(tiff_np[:,:,index1]) + np.log(tiff_np[:,:,index2]))
+    else:
+        rsi = (tiff_np[:,:,index1]-tiff_np[:,:,index2])/(tiff_np[:,:,index1]+tiff_np[:,:,index2])
+    rsi = np.nan_to_num(rsi)
+    tiff_np = np.concatenate((tiff_np, np.expand_dims(rsi, axis=2)), axis=2)
     return tiff_np
 
 def save_slices(filenum, tiff, mask, **conf):

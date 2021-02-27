@@ -43,7 +43,7 @@ class CoastalDataset(Dataset):
     binary mask
     """
 
-    def __init__(self, folder_path, use_channels):
+    def __init__(self, folder_path, use_channels, normalize=True):
         """Initialize dataset.
         Args:
             folder_path(str): A path to data directory
@@ -51,6 +51,11 @@ class CoastalDataset(Dataset):
 
         self.img_files = glob.glob(os.path.join(folder_path, 'tiff*'))
         self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
+        self.use_channels = use_channels
+        self.normalize = normalize
+        if self.normalize:
+            arr = np.load(folder_path.parent / "normalize.npy")
+            self.mean, self.std = arr[0][use_channels], arr[1][use_channels]
 
     def __getitem__(self, index):
 
@@ -64,8 +69,8 @@ class CoastalDataset(Dataset):
         img_path = self.img_files[index]
         mask_path = self.mask_files[index]
         data = np.load(img_path)
-        print(data.shape)
-        input()
+        data = data[:,:,self.use_channels]
+        data = (data - self.mean) / self.std
         label = np.load(mask_path)
 
         return torch.from_numpy(data).float(), torch.from_numpy(label).float()
