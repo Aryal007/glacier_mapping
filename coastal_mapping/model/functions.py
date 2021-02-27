@@ -11,7 +11,7 @@ Training/Validation Functions
 from torchvision.utils import make_grid
 import torch
 import numpy as np
-from coastal_mapping.model.metrics import diceloss
+from coastal_mapping.model.metrics import diceloss, balancedloss
 
 
 def train_epoch(loader, frame, metrics_opts, masked):
@@ -33,12 +33,11 @@ def train_epoch(loader, frame, metrics_opts, masked):
       and the metrics on the training set.
     """
     loss, metrics = 0, {}
-    batch_size = len(loader)
 
     for i, (x,y) in enumerate(loader):
         y_hat, _loss = frame.optimize(x, y)
         loss += _loss
-        log_batch(i, loss, batch_size)
+        log_batch(i, loss, len(loader), loader.batch_size)
 
         y_hat = frame.segment(y_hat)
         metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
@@ -80,12 +79,13 @@ def validate(loader, frame, metrics_opts, masked):
             metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
             update_metrics(metrics, metrics_)
 
+    frame.val_operations(loss/len(loader.dataset))
     mean_metrics = agg_metrics(metrics)
             
     return loss / len(loader.dataset), mean_metrics
 
 
-def log_batch(i, loss, batch_size):
+def log_batch(i, loss, n_batches, batch_size):
     """Helper to log a training batch
 
     :param i: Current batch index
@@ -96,7 +96,7 @@ def log_batch(i, loss, batch_size):
     :type batch_size: int
     """
     print(
-        f"Training batch {i+1} of {batch_size}, Loss = {loss/(i+1):.5f}",
+        f"Training batch {i+1} of {n_batches}, Loss = {loss/batch_size/(i+1):.5f}",
         end="\r",
         flush=True,
     )
@@ -141,16 +141,27 @@ def log_images(writer, frame, batch, epoch, stage):
     if epoch == 0:
         writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, :3]))), epoch)
         writer.add_image(f"{stage}/y", make_grid(y.unsqueeze(1)), epoch)
+        
     writer.add_image(f"{stage}/y_hat", make_grid(y_hat.unsqueeze(1)), epoch)
     
-def get_dice_loss(outchannels, masked):
-    if outchannels > 1:
+def get_loss(outchannels, opts=None):
+    if opts is None:
+        return diceloss()
+        
+    if opts["weights"] == "None":
         loss_weight = np.ones(outchannels) / outchannels
-        label_smoothing = 0.2
-        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
-                               outchannels=outchannels, label_smoothing=label_smoothing, masked=masked)
     else:
-        loss_fn = diceloss()
+        loss_weight = opts["weights"]
+    label_smoothing = opts["label_smoothing"]
+    if opts["name"] == "dice":
+        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
+                            outchannels=outchannels, label_smoothing=label_smoothing, masked=opts["masked"])
+    elif opts["name"] == "balanced":
+        loss_fn = balancedloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts["masked"])
+    else:
+        raise ValueError("Loss name must be dice or balanced!")
+
     return loss_fn
 
 def update_metrics(main_metrics, batch_metrics):

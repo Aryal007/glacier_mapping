@@ -40,7 +40,7 @@ class Framework:
         optimizer_def = getattr(torch.optim, optimizer_opts.name)
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts.args)
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
-                                             verbose=True, patience=50,
+                                             verbose=True, patience=5,
                                              min_lr=1e-6)
         self.reg_opts = reg_opts
 
@@ -140,7 +140,7 @@ class Framework:
 
         if masked:
             mask = torch.sum(y, dim=3) == 1
-            y_hat[mask] == torch.zeros(y.shape[3])
+            y_hat[mask] == torch.zeros(y.shape[3]).to(self.device)
 
         results = {}
         for k, metric in metrics_opts.items():
@@ -181,3 +181,6 @@ class Framework:
         else:
             y_hat = torch.sigmoid(logits)
         return y_hat
+
+    def load_state_dict(self, state_dict):
+        self.model.load_state_dict(state_dict)
