@@ -58,6 +58,7 @@ if __name__ == "__main__":
         tiff_np = add_index(tiff_np, index1 = 3, index2 = 2, comment = "ndswi")
     
     tiff_np = tiff_np[:,:,conf.use_channels]
+    
     arr = np.load(data_dir / "processed" / "normalize.npy")
     mean, std = arr[0][conf.use_channels], arr[1][conf.use_channels]
     orig_image = tiff_np
