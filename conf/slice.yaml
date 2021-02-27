@@ -7,5 +7,6 @@ filter: 0.1
 train_split: 0.6 
 val_split: 0.2
 test_split: 0.2
-add_ndvi: False
-add_ndwi: False
+add_ndvi: True
+add_ndwi: True
+add_ndswi: True

@@ -3,6 +3,7 @@ batch_size: 64
 run_name: "unmasked_dice"
 epochs: 51
 save_every: 10
+use_channels: [0,1,2,3,4,5,6]
 loss_opts:
   name: "dice"
   masked: False

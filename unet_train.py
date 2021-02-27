@@ -20,7 +20,7 @@ if __name__ == "__main__":
     data_dir = pathlib.Path(conf.data_dir)
     processed_dir = data_dir / "processed"
 
-    loaders = fetch_loaders(processed_dir, conf.batch_size)
+    loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels)
 
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)    
         

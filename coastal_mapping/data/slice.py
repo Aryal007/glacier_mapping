@@ -107,8 +107,7 @@ def get_mask(tiff, shp, column="Id"):
     classes = set(shp[column])
 
     shapefile_crs = rasterio.crs.CRS.from_string(str(shp.crs))
-    print("Here")
-    input()
+
     if shapefile_crs != tiff.meta["crs"]:
         shp = shp.to_crs(tiff.meta["crs"].data)
     check_crs(tiff.crs, shp.crs)
@@ -134,6 +133,13 @@ def get_mask(tiff, shp, column="Id"):
 
     return mask
 
+def add_index(tiff_np, index1, index2, comment=None):
+    ndvi = np.zeros((tiff_np.shape[0], tiff_np.shape[1]))
+    ndvi = (tiff_np[:,:,index1]-tiff_np[:,:,index2])/(tiff_np[:,:,index1]+tiff_np[:,:,index2])
+    ndvi = np.nan_to_num(ndvi)
+    tiff_np = np.concatenate((tiff_np, np.expand_dims(ndvi, axis=2)), axis=2)
+    return tiff_np
+
 def save_slices(filenum, tiff, mask, **conf):
     def verify_slice_size(slice, conf):
         if slice.shape[0] != conf["window_size"][0] or slice.shape[1] != conf["window_size"][1]:
@@ -155,9 +161,15 @@ def save_slices(filenum, tiff, mask, **conf):
     if not os.path.exists(conf["out_dir"]):
         os.makedirs(conf["out_dir"])
     tiff_np = np.transpose(tiff.read(), (1,2,0))
-    print(tiff_np.shape)
-    input()
+    tiff_np = tiff_np / 255
 
+    if conf["add_ndvi"]:
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 0, comment = "ndvi")
+    if conf["add_ndwi"]:
+        tiff_np = add_index(tiff_np, index1 = 1, index2 = 3, comment = "ndwi")
+    if conf["add_ndswi"]:
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 2, comment = "ndswi")
+        
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):
         for column in range(0, tiff_np.shape[0], conf["window_size"][1]-conf["overlap"]):
@@ -172,6 +184,8 @@ def save_slices(filenum, tiff, mask, **conf):
                 print(f"Saved image {filenum} slice {slicenum}")
 
             slicenum += 1
+
+    return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1))
 
 def remove_and_create(dirpath):
     if os.path.exists(dirpath) and os.path.isdir(dirpath):

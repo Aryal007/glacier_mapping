@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch
 
-def fetch_loaders(processed_dir, batch_size=32,
+def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1,2,3],
                   train_folder='train', val_folder='val', test_folder='',
                   shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
@@ -21,8 +21,8 @@ def fetch_loaders(processed_dir, batch_size=32,
     Return:
         Returns train and val dataloaders
     """
-    train_dataset = CoastalDataset(processed_dir / train_folder)
-    val_dataset = CoastalDataset(processed_dir / val_folder)
+    train_dataset = CoastalDataset(processed_dir / train_folder, use_channels)
+    val_dataset = CoastalDataset(processed_dir / val_folder, use_channels)
     
     loader = {
         "train": DataLoader(train_dataset, batch_size=batch_size,
@@ -31,7 +31,7 @@ def fetch_loaders(processed_dir, batch_size=32,
                           num_workers=3, shuffle=False)}
 
     if test_folder:
-        test_dataset = CoastalDataset(processed_dir / test_folder)
+        test_dataset = CoastalDataset(processed_dir / test_folder, use_channels)
         loader["test"] = DataLoader(test_dataset, batch_size=batch_size,
                                     num_workers=3, shuffle=False)
 
@@ -43,7 +43,7 @@ class CoastalDataset(Dataset):
     binary mask
     """
 
-    def __init__(self, folder_path):
+    def __init__(self, folder_path, use_channels):
         """Initialize dataset.
         Args:
             folder_path(str): A path to data directory
@@ -64,8 +64,8 @@ class CoastalDataset(Dataset):
         img_path = self.img_files[index]
         mask_path = self.mask_files[index]
         data = np.load(img_path)
-        if data.dtype == "uint16":
-            data = data/255
+        print(data.shape)
+        input()
         label = np.load(mask_path)
 
         return torch.from_numpy(data).float(), torch.from_numpy(label).float()
