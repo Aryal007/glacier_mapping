@@ -12,7 +12,7 @@ import coastal_mapping.data.slice as fn
 import warnings
 warnings.filterwarnings("ignore")
 
-conf = Dict(yaml.safe_load(open('./conf/slice.yaml')))
+conf = Dict(yaml.safe_load(open('./conf/slice_and_preprocess.yaml')))
 
 label_filenames = [x for x in os.listdir(conf.labels_dir) if x.endswith('.shp')]
 tiff_filenames = [x.replace('shp','TIF') for x in label_filenames]

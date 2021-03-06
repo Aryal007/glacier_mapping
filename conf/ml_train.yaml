@@ -1,0 +1,9 @@
+data_dir: "/mnt/datadrive/noaa/ml_data/"
+estimator_name: "xgboost"
+tune_estimators: False
+tune_depth: True
+train: True
+n_estimator: 15
+max_depth: 9
+feature_importance: False
+min_samples_split: 100

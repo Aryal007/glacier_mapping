@@ -16,7 +16,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
-    conf = Dict(yaml.safe_load(open('./conf/train.yaml')))
+    conf = Dict(yaml.safe_load(open('./conf/unet_train.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
     processed_dir = data_dir / "processed"
 

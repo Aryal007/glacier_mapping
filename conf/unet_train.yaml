@@ -1,8 +1,8 @@
 data_dir: "/mnt/datadrive/noaa/"
 batch_size: 32
-run_name: "masked_dice_all_channels_deep"
-epochs: 51
-save_every: 10
+run_name: "7_channels"
+epochs: 76
+save_every: 15
 use_channels: [0,1,2,3,4,5,6]
 loss_opts:
   name: "dice"
