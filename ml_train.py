@@ -140,9 +140,9 @@ class Classifier():
                 print(f"Estimators: {n_estimators}, Depth: {max_depth}")
                 estimator, outputs = self.train_and_evaluate(clf, trainX, trainY, testX, testY)
                 scores[i] = estimator.score(testX, testY)
-            score_matrix = np.vstack((n_estimators_range, scores))
+            score_matrix = np.vstack((max_depth_range, scores))
             print(score_matrix)
-            np.save(self.savepath / 'tune_estimators', score_matrix)
+            np.save(self.savepath / 'tune_depth', score_matrix)
 
         if train:
             estimator = RandomForestClassifier(n_estimators = n_estimators, max_depth = max_depth, min_samples_split = min_samples_split, random_state=42) 
@@ -195,9 +195,9 @@ class Classifier():
                 print(f"Estimators: {n_estimators}, Depth: {max_depth}")
                 estimator, outputs = self.train_and_evaluate(clf, trainX, trainY, testX, testY)
                 scores[i] = estimator.score(testX, testY)
-            score_matrix = np.vstack((n_estimators_range, scores))
+            score_matrix = np.vstack((max_depth_range, scores))
             print(score_matrix)
-            np.save(self.savepath / 'tune_estimators', score_matrix)
+            np.save(self.savepath / 'tune_depth', score_matrix)
 
         if train:
             estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_samples_split = min_samples_split, random_state=42) 
