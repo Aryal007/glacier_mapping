@@ -1,6 +1,6 @@
 data_dir: "/mnt/datadrive/noaa/"
-filename: '2017_NOAA_ANWR_4Band251.TIF'
-run_name: 'masked_dice_all_channels_deep'
+filename: '2017_NOAA_ANWR_4Band122.TIF'
+run_name: '7_channels'
 window_size: [512,512]
 model_opts:
   args: 

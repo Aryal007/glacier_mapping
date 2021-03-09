@@ -10,7 +10,7 @@ from coastal_mapping.model.frame import Framework
 from coastal_mapping.data.slice import add_index
 import coastal_mapping.model.functions as fn
 
-import yaml, pathlib
+import yaml, pathlib, pickle
 from addict import Dict
 import rasterio
 import numpy as np
@@ -18,8 +18,14 @@ import warnings
 import pdb
 import torch
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib
 
 warnings.filterwarnings("ignore")
+
+font = {'size'   : 20}
+
+matplotlib.rc('font', **font)
 
 if __name__ == "__main__":
     conf = Dict(yaml.safe_load(open('./conf/unet_predict.yaml')))
@@ -68,6 +74,11 @@ if __name__ == "__main__":
 
     x = np.expand_dims(tiff_np, axis=0)
     y = np.zeros((x.shape[1], x.shape[2]))
+    y_rf = np.zeros((x.shape[1], x.shape[2]))
+    y_xgboost = np.zeros((x.shape[1], x.shape[2]))
+
+    rf_model = pickle.load(open("/mnt/datadrive/noaa/ml_data/random_forest/estimator.sav", 'rb'))
+    xgboost_model = pickle.load(open("/mnt/datadrive/noaa/ml_data/xgboost/estimator.sav", 'rb'))
 
     x = torch.from_numpy(x).float()
 
@@ -78,11 +89,21 @@ if __name__ == "__main__":
                 temp = np.zeros((1, conf.window_size[0], conf.window_size[1], x.shape[3]))
                 temp[:, :current_slice.shape[1], :current_slice.shape[2], :] =  current_slice
                 current_slice = torch.from_numpy(temp).float()
-            mask = current_slice.squeeze().sum(dim=2) == 0
+            mask = current_slice.squeeze()[:,:,:3].sum(dim=2) == 0
             prediction = frame.infer(current_slice)
             prediction = torch.nn.Softmax(3)(prediction)
             prediction = np.asarray(prediction.cpu()).squeeze()[:,:,1]
             prediction[mask] = 0
+
+            _current_slice = np.asarray(current_slice.cpu()).squeeze()
+            _current_slice = _current_slice.reshape((_current_slice.shape[0]*_current_slice.shape[1]), _current_slice.shape[2])
+            prediction_rf = rf_model.predict_proba(_current_slice)
+            prediction_xgboost = xgboost_model.predict_proba(_current_slice)
+            prediction_rf = prediction_rf.reshape(current_slice.shape[1], current_slice.shape[2], prediction_rf.shape[1])
+            prediction_xgboost = prediction_xgboost.reshape(current_slice.shape[1], current_slice.shape[2], prediction_xgboost.shape[1])
+            prediction_rf = prediction_rf[:,:,1]
+            prediction_xgboost = prediction_xgboost[:,:,1]
+
             endrow_dest = row+conf.window_size[0]
             endrow_source = conf.window_size[0]
             endcolumn_dest = column+conf.window_size[0]
@@ -95,26 +116,28 @@ if __name__ == "__main__":
                 endcolumn_dest = y.shape[1]
             try:
                 y[row:endrow_dest, column:endcolumn_dest] = prediction[0:endrow_source, 0:endcolumn_source]
-            except:
+                y_rf[row:endrow_dest, column:endcolumn_dest] = prediction_rf[0:endrow_source, 0:endcolumn_source]
+                y_xgboost[row:endrow_dest, column:endcolumn_dest] = prediction_xgboost[0:endrow_source, 0:endcolumn_source]
+            except Exception as e:
                 print("Something wrong with indexing!")
-
-    fig, plots = plt.subplots(nrows = 2, ncols=2, figsize=(20, 16))
-    images = [orig_image[:,:,:3], (orig_image[:,:,5]+1/2), (orig_image[:,:,6]+1)/2, (y-0.1)/0.8]
-    titles = ["Original Image", "NDWI", "NDSWI", "U-Net Prediction"]
+            
+    fig, plots = plt.subplots(nrows = 2, ncols=3, figsize=(20, 20))
+    images = [orig_image[:,:,:3], (orig_image[:,:,5]+1/2), (orig_image[:,:,6]+1)/2, (y-0.1)/0.8, y_rf, y_xgboost]
+    titles = ["Original Image", "NDWI", "NDSWI", "U-Net Prediction", "Random Forest", "XGBoost"]
 
     for i, graphs in enumerate(plots.flat):
         im = graphs.imshow(images[i], vmin=0, vmax=1)
         graphs.set_title(titles[i], fontsize=20)
         graphs.axis('off')
 
-    fig.suptitle("Various masks", fontsize=28)
-    plt.colorbar(im, ax=plots.ravel().tolist(), label="Water Intensity", orientation="vertical")
+    fig.suptitle("Multi Approach Water Intensity Masks", fontsize=28)
+    plt.colorbar(im, ax=plots.ravel().tolist(), label="Water Intensity", orientation="horizontal")
     plt.savefig(filename+".png")
     plt.close(fig)
 
-    fig, plots = plt.subplots(ncols=3, figsize = (12,4), sharey=False, tight_layout=True)
-    hists = [orig_image[:,:,5].flatten(), orig_image[:,:,6].flatten(), y.flatten()]
-    titles = ["NDWI", "NDSWI", "U-Net Prediction"]
+    fig, plots = plt.subplots(ncols=5, figsize = (20,4), sharey=False, tight_layout=True)
+    hists = [orig_image[:,:,5].flatten(), orig_image[:,:,6].flatten(), y.flatten(), y_rf.flatten(), y_xgboost.flatten()]
+    titles = ["NDWI", "NDSWI", "U-Net", "Random Forest", "XGBoost"]
     for i, graphs in enumerate(plots.flat):
         weights = np.ones_like(hists[i])/float(len(hists[i]))
         im = graphs.hist(hists[i], bins=256, range=[-0.5, 1], weights=weights)

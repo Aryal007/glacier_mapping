@@ -8,5 +8,5 @@ torchvision==0.8.2
 tensorboard==2.4.1
 six==1.12.0
 matplotlib==3.3.4
-sklearn==0.24.1
+sklearn
 xgboost==1.3.3

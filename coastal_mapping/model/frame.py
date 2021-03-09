@@ -17,6 +17,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import os
 from .metrics import *
 from .unet import *
+import pdb
 
 class Framework:
     """
@@ -33,12 +34,14 @@ class Framework:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
+        if optimizer_opts is None:
+            optimizer_opts = {"name": "Adam", "args": {"lr": 0.001}}
         self.multi_class = True if model_opts.args.outchannels > 1 else False
         self.num_classes = model_opts.args.outchannels    
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
-        optimizer_def = getattr(torch.optim, optimizer_opts.name)
-        self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts.args)
+        optimizer_def = getattr(torch.optim, optimizer_opts["name"])
+        self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose=True, patience=5,
                                              min_lr=1e-6)

@@ -2,3 +2,6 @@
 *pycache*
 .vscode
 .gitignore
+unet_predict.py
+*.png
+conf/unet_predict.yaml

@@ -3,7 +3,7 @@ estimator_name: "xgboost"
 tune_estimators: False
 tune_depth: False
 train: True
-n_estimator: 15
-max_depth: 10
+n_estimator: 50
+max_depth: 15
 feature_importance: False
 min_samples_split: 100

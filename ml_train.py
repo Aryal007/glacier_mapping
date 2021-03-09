@@ -112,7 +112,7 @@ class Classifier():
     def random_forest(self, trainX, trainY, testX, testY, 
                         tune_estimators = False, tune_depth = False, train=True, 
                         n_estimators = 10, max_depth = 3, 
-                         min_samples_split = 100, feature_importance = False):
+                        min_samples_split = 100, feature_importance = False):
         print('\nRandom Forest')
         n_estimators_range = np.asarray([2, 5, 10, 15, 20, 25, 50])
         max_depth_range = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -166,7 +166,7 @@ class Classifier():
     def xgboost(self, trainX, trainY, testX, testY, 
                 tune_estimators = False, tune_depth = False, train=True, 
                 n_estimators = 10, max_depth = 3, 
-                min_samples_split = 100, feature_importance = False):
+                min_child_weight = 100, feature_importance = False):
         print('\nXGBoost')
         n_estimators_range = np.asarray([2, 5, 10, 15, 20, 25, 50])
         max_depth_range = np.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -174,7 +174,7 @@ class Classifier():
         if tune_estimators:
             scores = np.zeros(len(n_estimators_range))
             for i, n_estimators in enumerate(n_estimators_range):
-                estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_samples_split = min_samples_split, random_state=42) 
+                estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_child_weight = min_child_weight, random_state=42) 
                 clf = Pipeline([
                     ('clf', estimator)
                 ])
@@ -188,7 +188,7 @@ class Classifier():
         if tune_depth:
             scores = np.zeros(len(max_depth_range))
             for i, max_depth in enumerate(max_depth_range):
-                estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_samples_split = min_samples_split, random_state=42) 
+                estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_child_weight = min_child_weight, random_state=42) 
                 clf = Pipeline([
                     ('clf', estimator)
                 ])
@@ -200,7 +200,7 @@ class Classifier():
             np.save(self.savepath / 'tune_depth', score_matrix)
 
         if train:
-            estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_samples_split = min_samples_split, random_state=42) 
+            estimator = XGBClassifier(n_estimators = n_estimators, max_depth = max_depth, min_child_weight = min_child_weight, random_state=42) 
             clf = Pipeline([
                 ('clf', estimator)
             ])
@@ -252,7 +252,7 @@ if __name__ == "__main__":
         classifier.xgboost(trainX=dataset.trainX, trainY=dataset.trainY, testX=dataset.testX, testY=dataset.testY,
                   tune_estimators = conf.tune_estimators, tune_depth = conf.tune_depth, 
                   train = conf.train, n_estimators = conf.n_estimator, 
-                  max_depth = conf.max_depth,  min_samples_split = conf.min_samples_split, 
+                  max_depth = conf.max_depth,  min_child_weight = conf.min_samples_split, 
                   feature_importance = conf.feature_importance)
 
     else:
