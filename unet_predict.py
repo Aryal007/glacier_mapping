@@ -20,7 +20,14 @@ import torch
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib
+from matplotlib import cm 
+from matplotlib.colors import ListedColormap
 
+top = cm.get_cmap('Oranges_r', 128)
+bottom = cm.get_cmap('Blues', 128)
+newcolors = np.vstack((top(np.linspace(0, 0.7, 128)),
+                       bottom(np.linspace(0.3, 1, 128))))
+OrangeBlue = ListedColormap(newcolors, name='OrangeBlue')
 warnings.filterwarnings("ignore")
 
 font = {'size'   : 20}
@@ -30,7 +37,7 @@ matplotlib.rc('font', **font)
 if __name__ == "__main__":
     conf = Dict(yaml.safe_load(open('./conf/unet_predict.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
-    tif_path = data_dir / "images" / conf.filename
+    tif_path = data_dir / "test_images" / "images" / conf.filename
     model_path = data_dir / "runs" / conf.run_name / "models" / "model_final.pt"
 
     tiff = rasterio.open(tif_path)
@@ -70,6 +77,7 @@ if __name__ == "__main__":
     arr = np.load(data_dir / "processed" / "normalize.npy")
     mean, std = arr[0][conf.use_channels], arr[1][conf.use_channels]
     orig_image = tiff_np
+
     tiff_np = (tiff_np - mean) / std
 
     x = np.expand_dims(tiff_np, axis=0)
@@ -122,25 +130,28 @@ if __name__ == "__main__":
                 print("Something wrong with indexing!")
             
     fig, plots = plt.subplots(nrows = 2, ncols=3, figsize=(20, 20))
-    images = [orig_image[:,:,:3], (orig_image[:,:,5]+1/2), (orig_image[:,:,6]+1)/2, (y-0.1)/0.8, y_rf, y_xgboost]
-    titles = ["Original Image", "NDWI", "NDSWI", "U-Net Prediction", "Random Forest", "XGBoost"]
+    images = [orig_image[:,:,:3], (orig_image[:,:,5]+1)/2, (orig_image[:,:,6]+1)/2, (y-0.1)/0.8, y_rf, y_xgboost]
+    titles = ["RGB Image", "NDWI", "NDSWI", "U-Net Prediction", "Random Forest", "XGBoost"]
 
     for i, graphs in enumerate(plots.flat):
-        im = graphs.imshow(images[i], vmin=0, vmax=1)
+        if i == 0:
+            im = graphs.imshow(images[i])
+        else:
+            im = graphs.imshow(images[i], vmin=0, vmax=1, cmap=bottom, alpha=0.7)
         graphs.set_title(titles[i], fontsize=20)
         graphs.axis('off')
 
     fig.suptitle("Multi Approach Water Intensity Masks", fontsize=28)
-    plt.colorbar(im, ax=plots.ravel().tolist(), label="Water Intensity", orientation="horizontal")
+    plt.colorbar(im, ax=plots.ravel().tolist(), label="Prediction Intensity for Water", orientation="horizontal")
     plt.savefig(filename+".png")
     plt.close(fig)
 
-    fig, plots = plt.subplots(ncols=5, figsize = (20,4), sharey=False, tight_layout=True)
-    hists = [orig_image[:,:,5].flatten(), orig_image[:,:,6].flatten(), y.flatten(), y_rf.flatten(), y_xgboost.flatten()]
+    fig, plots = plt.subplots(ncols=5, figsize = (20,4), sharey=True, tight_layout=True)
+    hists = [((orig_image[:,:,5]+1)/2).flatten(), ((orig_image[:,:,6]+1)/2).flatten(), ((y-0.1)/0.8).flatten(), y_rf.flatten(), y_xgboost.flatten()]
     titles = ["NDWI", "NDSWI", "U-Net", "Random Forest", "XGBoost"]
     for i, graphs in enumerate(plots.flat):
         weights = np.ones_like(hists[i])/float(len(hists[i]))
-        im = graphs.hist(hists[i], bins=256, range=[-0.5, 1], weights=weights)
+        im = graphs.hist(hists[i], bins=256, range=[0, 1], weights=weights)
         graphs.set_title(titles[i])
     fig.suptitle("Histograms for intensity distribution", fontsize=14)
     plt.savefig(filename+"_histogram.png")

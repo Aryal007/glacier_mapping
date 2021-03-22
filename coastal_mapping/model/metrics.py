@@ -39,7 +39,7 @@ def recall(pred, true, label=1):
 
 
 def pixel_acc(pred, true):
-    return (pred == true).sum().item() / true.numel()
+    return (pred == true).sum().item() / true.size
 
 
 def dice(pred, true, label=1):

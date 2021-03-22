@@ -1,0 +1,5 @@
+preds_dir: "/mnt/datadrive/noaa/test_images/preds/"
+model_name: "random_forest"
+processed_dir: "/mnt/datadrive/noaa/test_images/processed/"
+threshold: 0.4
+label: "land"
