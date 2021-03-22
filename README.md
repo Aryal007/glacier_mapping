@@ -74,7 +74,7 @@ https://docs.microsoft.com/en-us/azure/virtual-machines/linux/n-series-driver-se
 
 ### Steps for training and evaluation
 On a windows machine, use python instead of python3
-</pre>
+<pre>
 Required for training
 * python3 slice_and_preprocess.py                                   Create slices, configuration: conf/slice.yaml
 * python3 unet_train.py                                             Train model, configuration: conf/train.yaml
@@ -87,7 +87,7 @@ Required for testing
 * python3 eval.py                                                   Generate region based evaluation csv file, configuration: conf/eval.yaml
 </pre>
 
-## Data Structure
+## Structure for data directory
 ```
 noaa
 │
