@@ -9,14 +9,9 @@ metrics and losses
 """
 import torch
 import numpy as np
+import pdb
 
-def precision(pred, true, label=1):
-    tp = ((pred == label) & (true == label)).sum().item()
-    fp = ((pred == label) & (true != label)).sum().item()
-
-    if tp == fp == 0:
-        return 0
-
+def precision(tp, fp, fn):
     return tp / (tp + fp)
 
 
@@ -28,41 +23,15 @@ def tp_fp_fn(pred, true, label=1):
     return tp, fp, fn
 
 
-def recall(pred, true, label=1):
-    tp = ((pred == label) & (true == label)).sum().item()
-    fn = ((pred != label) & (true == label)).sum().item()
+def recall(tp, fp, fn):
+    return tp / (tp + fn)
 
-    try:
-        return tp / (tp + fn)
-    except:
-        return 0
+def dice(tp, fp, fn):
+    return (2 * tp) / (2 * tp + fp + fn)
 
-
-def pixel_acc(pred, true):
-    return (pred == true).sum().item() / true.size
-
-
-def dice(pred, true, label=1):
-    tp = ((pred == label) & (true == label)).sum().item()
-    fp = ((pred == label) & (true != label)).sum().item()
-    fn = ((pred != label) & (true == label)).sum().item()
-
-    try:
-        return (2 * tp) / (2 * tp + fp + fn)
-    except:
-        return 0
-
-
-def IoU(pred, true, label=1):
-    tp = ((pred == label) & (true == label)).sum().item()
-    fp = ((pred == label) & (true != label)).sum().item()
-    fn = ((pred != label) & (true == label)).sum().item()
-
-    try:
-        return tp / (tp + fp + fn)
-    except:
-        return 0
-
+def IoU(tp, fp, fn):
+    return tp / (tp + fp + fn)
+    
 class diceloss(torch.nn.Module):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
         super().__init__()

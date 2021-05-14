@@ -1,12 +1,15 @@
-image_dir: "/mnt/datadrive/noaa/test_images/images/"
-labels_dir: "/mnt/datadrive/noaa/test_images/labels/"
-out_dir: "/mnt/datadrive/noaa/test_images/processed/"
-window_size: [512,512]
+image_dir: "/datadrive/DynamicEarthNet/planet/"
+labels_dir: "/datadrive/DynamicEarthNet/Labels/"
+out_dir: "/datadrive/DynamicEarthNet/processed/"
+split_dir: "/datadrive/DynamicEarthNet/splits/"
+window_size: [512, 512]
 overlap: 0
-filter: 0.1
-train_split: 0.6 
-val_split: 0.2
-test_split: 0.1
+filter: 0.02
+train_split: 0.67 
+val_split: 0.33
+test_split: 0.0
 add_ndvi: True
 add_ndwi: True
 add_ndswi: True
+add_evi2: True
+add_osavi1: True

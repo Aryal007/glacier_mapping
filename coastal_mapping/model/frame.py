@@ -43,7 +43,7 @@ class Framework:
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
-                                             verbose=True, patience=5,
+                                             verbose=True, patience=3,
                                              min_lr=1e-6)
         self.reg_opts = reg_opts
 
@@ -126,13 +126,12 @@ class Framework:
         return loss
 
 
-    def metrics(self, y_hat, y, metrics_opts, masked):
+    def metrics(self, y_hat, y, masked):
         """ Loop over metrics in train.yaml
 
         Args:
             y_hat: Predictions
             y: Labels
-            metrics_opts: Metrics specified in the train.yaml
 
         Return:
             results
@@ -140,22 +139,28 @@ class Framework:
         """
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
+        n_classes = y.shape[3]
 
         if masked:
-            mask = torch.sum(y, dim=3) == 1
-            y_hat[mask] == torch.zeros(y.shape[3]).to(self.device)
+            mask = torch.sum(y, dim=3) == 0
 
-        results = {}
-        for k, metric in metrics_opts.items():
-            if "threshold" in metric.keys():
-                metric_value = torch.zeros(y_hat.shape[3])
-                y_hat = y_hat > metric["threshold"]
-                metric_fun = globals()[k]
-                for i in range(y_hat.shape[3]):
-                    metric_value[i] = metric_fun(y_hat[:,:,:,i], y[:,:,:,i])
-            results[k] = metric_value
+        y_hat = np.argmax(y_hat.cpu().numpy(), axis=3)+1
+        y = np.argmax(y.cpu().numpy(), axis=3)+1
+
+        if masked:
+            y_hat[mask] = 0
+            y[mask] = 0
+        
+        tp, fp, fn = torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+        for i in range(n_classes):
+            _y_hat = (y_hat == i+1).astype(np.uint8)
+            _y = (y == i+1).astype(np.uint8)
+            _tp, _fp, _fn = tp_fp_fn(_y_hat, _y)
+            tp[i] = _tp
+            fp[i] = _fp
+            fn[i] = _fn
             
-        return results
+        return tp, fp, fn
     
     def segment(self, y_hat):
         """Predict a class given logits

@@ -21,19 +21,20 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1,2,3],
     Return:
         Returns train and val dataloaders
     """
-    train_dataset = CoastalDataset(processed_dir / train_folder, use_channels)
-    val_dataset = CoastalDataset(processed_dir / val_folder, use_channels)
+    normalize = False
+    train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize)
+    val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
     
     loader = {
         "train": DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=8, shuffle=shuffle),
         "val": DataLoader(val_dataset, batch_size=batch_size,
-                          num_workers=3, shuffle=False)}
+                          num_workers=3, shuffle=shuffle)}
 
     if test_folder:
         test_dataset = CoastalDataset(processed_dir / test_folder, use_channels)
         loader["test"] = DataLoader(test_dataset, batch_size=batch_size,
-                                    num_workers=3, shuffle=False)
+                                    num_workers=3, shuffle=shuffle)
 
     return loader
 
@@ -49,7 +50,7 @@ class CoastalDataset(Dataset):
             folder_path(str): A path to data directory
         """
 
-        self.img_files = glob.glob(os.path.join(folder_path, 'tiff*'))
+        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))
         self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
         self.use_channels = use_channels
         self.normalize = normalize
@@ -70,9 +71,10 @@ class CoastalDataset(Dataset):
         mask_path = self.mask_files[index]
         data = np.load(img_path)
         data = data[:,:,self.use_channels]
-        data = (data - self.mean) / self.std
+        if self.normalize:
+            data = (data - self.mean) / self.std
         label = np.load(mask_path)
-
+        
         return torch.from_numpy(data).float(), torch.from_numpy(label).float()
 
     def __len__(self):

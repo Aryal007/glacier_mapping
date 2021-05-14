@@ -12,13 +12,15 @@ import coastal_mapping.model.functions as fn
 from torch.utils.tensorboard import SummaryWriter
 import yaml, json, pathlib
 from addict import Dict
-import warnings
+import warnings, pdb
+import torch
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
     conf = Dict(yaml.safe_load(open('./conf/unet_train.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
-    processed_dir = data_dir / "processed"
+    class_name = conf.class_name
+    processed_dir = data_dir / "processed" / class_name
 
     loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels)
 
@@ -35,6 +37,13 @@ if __name__ == "__main__":
     writer = SummaryWriter(f"{data_dir}/runs/{conf.run_name}/logs/")
     writer.add_text("Configuration Parameters", json.dumps(conf))
     out_dir = f"{data_dir}/runs/{conf.run_name}/models/"
+
+    model_path = "/datadrive/DynamicEarthNet/runs/Forest/models/model_final.pt"
+    if torch.cuda.is_available():
+        state_dict = torch.load(model_path)
+    else:
+        state_dict = torch.load(model_path, map_location="cpu")
+    frame.load_state_dict(state_dict)
 
     train_batch = next(iter(loaders["train"]))
     val_batch = next(iter(loaders["val"]))

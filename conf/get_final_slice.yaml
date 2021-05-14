@@ -1,0 +1,7 @@
+label: 5
+processed_dir: "/datadrive/DynamicEarthNet/processed/"
+window_size: [512, 512]
+augmented: True
+negative_label: [5,1,7]
+neg_size: 10 # [1-21 with 1 being no negative sample and 21 being all negative samples]
+rand_size: 7 # [1-21 with 1 being no random sample and 21 being all random samples]
