@@ -1,23 +1,15 @@
 data_dir: "/datadrive/DynamicEarthNet/"
-class_name: "Soil"
+class_name: "Snow"
 batch_size: 4
-run_name: "Soil"
-epochs: 31
+run_name: "Snow"
+epochs: 11
 save_every: 5
 use_channels: [0,1,2,3,4,5,6,7,8]
 loss_opts:
   name: "dice"
   masked: True
-  weights: [1.1308822, 1] # Soil Augmented
-  # [26.24298859, 30.89266205] # Snow
-  # [193.55163956, 8.36180878] # Water
-  # [206.89966583, 152.77987671] # Soil
-  # [103.37233734, 3.72234726] # Wetlands
-  # [122.58810043, 27.26075745] # Agriculture
-  # [205.86384201, 156.54133987] # Forest
-  # [234.48065567, 8.99810791] # Impervious
-  # [1532.76906204, 53.1802597] # Impervious Augmented
-  # [1.67104853, 1] # Agriculture Augmented
+  weights: [1.41683917, 1] # Snow Augmented
+  # [1.98757861, 1] # Agriculture Augmented
   # [1, 1.02404193] # Forest Augmented
   # [7.63886255, 1] # Impervious Augmented
   # [17.25716061, 1] # Wetlands Augmented
@@ -30,15 +22,15 @@ model_opts:
     inchannels: 9
     outchannels: 2
     net_depth: 5
-    dropout: 0.3
+    dropout: 0.0001
     spatial: True
     first_channel_output: 64
 optim_opts:
   name: "Adam"
   args:
-    lr: 0.0001
+    lr: 0.000001
 log_opts:
-  mask_names: ["Soil"]
+  mask_names: ["Snow"]
 reg_opts:
-  l1_reg: 0.0005
+  l1_reg: 0.00005
 metrics_opts: ["IoU", "precision", "recall"]

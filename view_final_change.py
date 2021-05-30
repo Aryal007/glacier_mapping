@@ -3,7 +3,8 @@ import numpy as np
 import os, pathlib
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-cmap = ListedColormap(["black","silver", "lightgreen", "forestgreen", "cyan", "tan", "dodgerblue", "white"])
+cmap = ListedColormap(["black", "silver", "lightgreen", "forestgreen", "cyan", "tan", "dodgerblue", "white"])
+#cmap = ListedColormap(["black", "white"])
 
 inp_dir = pathlib.Path("./final")
 out_dir = pathlib.Path("./final_vis")

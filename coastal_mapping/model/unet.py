@@ -24,10 +24,11 @@ class ConvBlock(nn.Module):
         super().__init__()
         self.conv1 = nn.Conv2d(inchannels, outchannels, kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv2d(outchannels, outchannels, kernel_size=kernel_size, padding=padding)
-        if spatial:
-            self.dropout = nn.Dropout2d(p=dropout)
-        else:
-            self.dropout = nn.Dropout(p=dropout)
+        if dropout > 0:
+            if spatial:
+                self.dropout = nn.Dropout2d(p=dropout)
+            else:
+                self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -47,7 +48,8 @@ class UpBlock(nn.Module):
         self.upconv = nn.ConvTranspose2d(
             inchannels, outchannels, kernel_size=kernel_size, stride=stride
         )
-        self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
+        if dropout > 0:
+            self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
 
     def forward(self, x, skips):
         x = self.upconv(x)

@@ -38,7 +38,7 @@ if __name__ == "__main__":
     writer.add_text("Configuration Parameters", json.dumps(conf))
     out_dir = f"{data_dir}/runs/{conf.run_name}/models/"
 
-    model_path = "/datadrive/DynamicEarthNet/runs/Forest/models/model_final.pt"
+    model_path = f"/datadrive/DynamicEarthNet/runs_dropout/{conf.run_name}/models/model_final.pt"
     if torch.cuda.is_available():
         state_dict = torch.load(model_path)
     else:

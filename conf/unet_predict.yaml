@@ -1,5 +1,5 @@
 data_dir: "/datadrive/DynamicEarthNet"
-satellite: "planet"
+satellite: "planet_test"
 zone: "10N"
 cubeid: "1311_3077_13"
 filename: '2018-01-01.tif'
@@ -11,7 +11,7 @@ model_opts:
     net_depth: 5
     dropout: 0.3
     spatial: True
-    first_channel_output: 4
+    first_channel_output: 64
 optim_opts:
   name: "Adam"
   args:

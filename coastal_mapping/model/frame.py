@@ -44,7 +44,7 @@ class Framework:
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose=True, patience=3,
-                                             min_lr=1e-6)
+                                             min_lr=1e-8)
         self.reg_opts = reg_opts
 
 
