@@ -13,11 +13,10 @@ training step can be concisely called with a single method.
 from pathlib import Path
 import torch
 import numpy as np
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
 import os
 from .metrics import *
 from .unet import *
-import pdb
 
 class Framework:
     """
@@ -43,8 +42,11 @@ class Framework:
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
-                                             verbose=True, patience=3,
-                                             min_lr=1e-8)
+                                             verbose = True, 
+                                             patience=5,
+                                             factor = 0.5,
+                                             min_lr = 1e-6)
+        self.lrscheduler2 = ExponentialLR(self.optimizer, 0.99, verbose=True)
         self.reg_opts = reg_opts
 
 
@@ -61,18 +63,22 @@ class Framework:
         x = x.permute(0, 3, 1, 2).to(self.device)
         y = y.permute(0, 3, 1, 2).to(self.device)
 
-        self.optimizer.zero_grad()
         y_hat = self.model(x)
         
         loss = self.calc_loss(y_hat, y)
         loss.backward()
+        return y_hat.permute(0, 2, 3, 1), loss
+    
+    def zero_grad(self):
         self.optimizer.step()
-        return y_hat.permute(0, 2, 3, 1), loss.item()
+        self.optimizer.zero_grad()
+
 
     def val_operations(self, val_loss):
         """
         Update the LR Scheduler
         """
+        #self.lrscheduler2.step()
         self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
@@ -114,14 +120,15 @@ class Framework:
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
         loss = self.loss_fn(y_hat, y)
-        for reg_type in self.reg_opts.keys():
-            reg_fun = globals()[reg_type]
-            penalty = reg_fun(
-                self.model.parameters(),
-                self.reg_opts[reg_type],
-                self.device
-            )
-            loss += penalty
+        if self.reg_opts:
+            for reg_type in self.reg_opts.keys():
+                reg_fun = globals()[reg_type]
+                penalty = reg_fun(
+                    self.model.parameters(),
+                    self.reg_opts[reg_type],
+                    self.device
+                )
+                loss += penalty
 
         return loss
 
@@ -192,3 +199,20 @@ class Framework:
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
+
+    def load_best(self, model_path):
+        print(f"Validation loss higher than previous for 3 steps, loading previous state")
+        if torch.cuda.is_available():
+            state_dict = torch.load(model_path)
+        else:
+            state_dict = torch.load(model_path, map_location="cpu")
+        self.load_state_dict(state_dict)
+    
+    def save_best(self, out_dir):
+        print(f"Current validation loss lower than previous, saving current state")
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        model_path = Path(out_dir, f"model_best.h5")
+        optim_path = Path(out_dir, f"optim_best.h5")
+        torch.save(self.model.state_dict(), model_path)
+        torch.save(self.optimizer.state_dict(), optim_path)

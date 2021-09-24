@@ -12,7 +12,10 @@ import numpy as np
 import pdb
 
 def precision(tp, fp, fn):
-    return tp / (tp + fp)
+    try:
+        return tp / (tp + fp)
+    except:
+        return 0
 
 
 def tp_fp_fn(pred, true, label=1):
@@ -24,13 +27,22 @@ def tp_fp_fn(pred, true, label=1):
 
 
 def recall(tp, fp, fn):
-    return tp / (tp + fn)
+    try:
+        return tp / (tp + fn)
+    except:
+        return 0
 
 def dice(tp, fp, fn):
-    return (2 * tp) / (2 * tp + fp + fn)
+    try:
+        return (2 * tp) / (2 * tp + fp + fn)
+    except:
+        return 0
 
 def IoU(tp, fp, fn):
-    return tp / (tp + fp + fn)
+    try:
+        return tp / (tp + fp + fn)
+    except:
+        return 0
     
 class diceloss(torch.nn.Module):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
@@ -41,17 +53,16 @@ class diceloss(torch.nn.Module):
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
+        self.criterion = torch.nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
         if len(self.w) != self.outchannels:
             raise ValueError("Loss weights should be equal to the output channels.")
-        # CE expects loss to have arg-max channel. Dice expects it to have one-hot
-        if len(pred.shape) > len(target.shape):
-            target = torch.nn.functional.one_hot(target, num_classes=self.outchannels).permute(0, 3, 1, 2)
+        if self.masked:
+            mask = torch.sum(target, dim=1) == 1
         target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
 
         if self.masked:
-            mask = torch.sum(target, dim=1) == 1
             pred = self.act(pred).permute(0, 2, 3, 1)
             target = target.permute(0, 2, 3, 1)
             intersection = (pred * target)[mask]
@@ -69,7 +80,9 @@ class diceloss(torch.nn.Module):
         union = A_sum + B_sum
         dice = 1 - ((2.0 * intersection + self.smooth) / (union + self.smooth))
         dice = dice * torch.tensor(self.w).to(device=dice.device)
-
+        #ce_loss = torch.sqrt(torch.abs(torch.square(pred[:,:,:,1]) - torch.square(target[:,:,:,1])))
+        #dist = torch.sqrt(torch.square(pred - target))
+        
         return dice.sum()
 
 class balancedloss(torch.nn.Module):

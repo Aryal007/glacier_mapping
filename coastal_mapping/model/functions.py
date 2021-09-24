@@ -16,7 +16,7 @@ import pdb
 from PIL import Image
 from .metrics import *
 
-def train_epoch(loader, frame, metrics_opts, masked):
+def train_epoch(loader, frame, metrics_opts, masked, grad_accumulation_steps=None):
     """Train model for one epoch
 
     This makes one pass through a dataloader and updates the model in the
@@ -35,17 +35,23 @@ def train_epoch(loader, frame, metrics_opts, masked):
       and the metrics on the training set.
     """
     n_classes = 2
-    loss, tp, fp, fn = 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+    loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
 
     for i, (x,y) in enumerate(loader):
         y_hat, _loss = frame.optimize(x, y)
-        loss += _loss
+        if grad_accumulation_steps != "None":
+            if (i+1) % grad_accumulation_steps == 0:
+                frame.zero_grad()
+        else:
+            frame.zero_grad()
+        loss += _loss.item()
         y_hat = frame.segment(y_hat)
         _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
         log_batch(i, loss, len(loader), loader.batch_size)
-        tp += _tp 
+        tp += _tp
         fp += _fp 
         fn += _fn 
+    frame.zero_grad()
     
     metrics = get_metrics(tp, fp, fn, metrics_opts)
         
@@ -79,16 +85,13 @@ def validate(loader, frame, metrics_opts, masked):
         with torch.no_grad():
             y_hat = frame.infer(x)
             loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
-
             y_hat = frame.segment(y_hat)
             _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
             tp += _tp 
             fp += _fp 
             fn += _fn 
-
     frame.val_operations(loss/len(loader.dataset))
-    metrics = get_metrics(tp, fp, fn, metrics_opts)
-            
+    metrics = get_metrics(tp, fp, fn, metrics_opts)  
     return loss / len(loader.dataset), metrics
 
 
@@ -136,25 +139,25 @@ def log_images(writer, frame, batch, epoch, stage):
     Return:
         Images Logged onto tensorboard
     """
+    batch = next(iter(batch))
     colors = {
-                0: np.array((0,0,0)),
-                1: np.array((0,255,0)),
-                2: np.array((255,0,0))
+                0: np.array((255,0,0)),
+                1: np.array((0,0,0)),
+                2: np.array((0,255,0))
             }
     pm = lambda x: x.permute(0, 3, 1, 2)
     squash = lambda x: (x - x.min()) / (x.max() - x.min())
-
     x, y = batch
     y_mask = np.sum(y.cpu().numpy(), axis=3) == 0
-    
     y_hat = frame.act(frame.infer(x))
     y = np.argmax(y.cpu().numpy(), axis=3) + 1
     y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
     y[y_mask] = 0
+    y_hat[y_mask] = 0
 
     _y = np.zeros((y.shape[0], y.shape[1], y.shape[2], 3))
     _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2], 3))
-    
+
     for i in range(len(colors)):
         _y[y == i] = colors[i]
         _y_hat[y_hat == i] = colors[i]
@@ -162,10 +165,8 @@ def log_images(writer, frame, batch, epoch, stage):
     y = _y
     y_hat = _y_hat
     
-    if epoch == 0:
-        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, :3]))), epoch)
-        writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)
-        
+    writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
+    writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)    
     writer.add_image(f"{stage}/y_hat", make_grid(pm(squash(torch.tensor(y_hat)))), epoch)
     
 def get_loss(outchannels, opts=None):
