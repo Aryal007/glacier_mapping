@@ -41,7 +41,7 @@ def add_rsi(img):
     out[:,:,5] = ndwi
     return out
 
-def add_supplementary(t):
+def add_supplementary(img, t):
     n_channels = img.shape[2]
     out = np.zeros((img.shape[0], img.shape[1], n_channels+7))
     out[:,:,:n_channels] = img
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         img = remove_outliers(img)
         img = min_max(img)
         img = add_rsi(img)
-        img = add_supplementary(t)
+        img = add_supplementary(img, t)
         if flag:
             val_count += 1
             lab_out_fname = str(l).replace(".tif","").replace("train_labels/","processed/val/mask_")

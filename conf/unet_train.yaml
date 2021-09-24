@@ -1,10 +1,10 @@
 data_dir: "/home/aryal007/DynamicEarthNet/Track2/data/"
 class_name: "Floodwater"
-batch_size: 2
-run_name: "C"
-epochs: 251
+batch_size: 1
+run_name: "C_3"
+epochs: 501
 save_every: 25
-use_channels: [0,1,2,3,4,5,10,11,12]
+use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 loss_opts:
   name: "dice"
   masked: True
@@ -12,12 +12,12 @@ loss_opts:
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 9
+    inchannels: 13
     outchannels: 2
-    net_depth: 6
+    net_depth: 7
     dropout: 0.2
     spatial: True
-    first_channel_output: 48
+    first_channel_output: 16
 optim_opts:
   name: "Adam"
   args:
@@ -25,6 +25,6 @@ optim_opts:
 log_opts:
   mask_names: ["XBackground", "Floodwater"]
 metrics_opts: ["IoU", "precision", "recall"]
-grad_accumulation_steps: 8
+grad_accumulation_steps: None
 reg_opts:
   l1_reg: 0.00001

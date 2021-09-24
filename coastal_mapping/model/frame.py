@@ -45,7 +45,7 @@ class Framework:
                                              verbose = True, 
                                              patience=5,
                                              factor = 0.5,
-                                             min_lr = 1e-6)
+                                             min_lr = 1e-9)
         self.lrscheduler2 = ExponentialLR(self.optimizer, 0.99, verbose=True)
         self.reg_opts = reg_opts
 

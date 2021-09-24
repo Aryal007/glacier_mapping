@@ -42,13 +42,13 @@ if __name__ == "__main__":
         loss = {}
         loss["train"], train_metric = fn.train_epoch(loaders["train"], frame, conf.metrics_opts, conf.loss_masked, conf.grad_accumulation_steps)
         fn.log_metrics(writer, train_metric, epoch+1, "train", conf.log_opts.mask_names)
-        fn.log_images(writer, frame, loaders["train"], epoch, "train")
 
         # validation loop
         loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts, conf.loss_masked)
         fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
 
         if epoch % 5 == 0:
+            fn.log_images(writer, frame, loaders["train"], epoch, "train")
             fn.log_images(writer, frame, loaders["val"], epoch, "val")
 
         writer.add_scalars("Loss", loss, epoch)
