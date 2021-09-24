@@ -55,6 +55,8 @@ if __name__ == "__main__":
         # Save model
         if epoch % conf.save_every == 0:
             frame.save(out_dir, epoch)
+        if conf.epochs - epoch <= 5:
+            frame.save(out_dir, epoch)
 
         print(f"{epoch+1}/{conf.epochs} | train_loss: {loss['train']:.5f} \
                 | val_loss: {loss['val']:.5f} \

@@ -26,11 +26,11 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     normalize = False
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
                                     transforms = transforms.Compose([
-                                               DropoutChannels(0.2),
-                                               FlipHorizontal(0.2),
-                                               FlipVertical(0.2),
-                                               Rot270(0.2),
-                                               Cut(0.2),
+                                               DropoutChannels(0.3),
+                                               FlipHorizontal(0.3),
+                                               FlipVertical(0.3),
+                                               Rot270(0.3),
+                                               Cut(0.3),
                                                #ElasticDeform(0.2)
                                            ]))
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
@@ -81,8 +81,8 @@ class CoastalDataset(Dataset):
         mask_path = self.mask_files[index]
         data = np.load(img_path)
         data = data[:,:,self.use_channels]   
-        mean = np.asarray([0, 0, 0, 0, 0, 0, 2.38418117e+02,  4.89992055e+00, 9.91401726e+00,  1.32865512e+01,  5.43796629e+00,  4.48784907e-01, 1.71167581e+02])
-        std = np.asarray([1, 1, 1, 1, 1, 1, 1.72717995e+01, 1.94082826e-01, 5.47965260e+00, 1.03936975e+01, 8.50344520e-01, 7.46339827e-01, 1.81930643e+01])
+        mean = np.asarray([0, 0, 0, 0, 0, 0, 2.38835277e+02,  4.99138411e+00, 1.00591349e+01,  1.33289707e+01,  5.55549108e+00,  4.80441443e-01, 1.59747973e+02])
+        std = np.asarray([1, 1, 1, 1, 1, 1, 1.73011714e+01, 1.99187397e-01, 5.91402628e+00, 1.07402841e+01, 9.28329093e-01, 8.09007041e-01, 1.34626650e+01])
         mean = mean[self.use_channels]   
         std = std[self.use_channels]   
         data = (data - mean) / std

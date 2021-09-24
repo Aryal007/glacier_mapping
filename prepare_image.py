@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from skimage.morphology import disk
 from skimage.filters import median
 
-val_ids = ['jja', 'tht', 'qus', 'coz', 'awc']
+val_ids = ['pxs', 'jja', 'qxb']
 min_values = np.array([-33.510303, -39.171803, -182.45174])
 max_values = np.array([7.2160087, 2.8161404, 40.3697])
 
@@ -140,5 +140,5 @@ if __name__ == "__main__":
     stds = np.asarray(stds)
     print(f"\nMean: {np.mean(means, axis=0)}")
     print(f"\nStandard Deviation: {np.mean(stds, axis=0)}")
-    print(f"\nValidation Samples: {val_count}, Training Samples: {train_count}, Validation %: {(val_count/train_count)*100:.2f}")
+    print(f"\nValidation Samples: {val_count}, Training Samples: {train_count}, Validation %: {(val_count/(val_count+train_count))*100:.2f}")
     print(f"\nBackground pixels: {background}, Flood pixels: {floodwater}, Ratio: {floodwater/background:.3f}")
