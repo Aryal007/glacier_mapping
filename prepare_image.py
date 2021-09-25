@@ -7,9 +7,11 @@ import matplotlib.pyplot as plt
 from skimage.morphology import disk
 from skimage.filters import median
 
-val_ids = ['hbe', 'tnp', 'wvy', 'ayt']
+val_ids = ['pxs', 'jja', 'qxb']
 min_values = np.array([-33.510303, -39.171803, -182.45174])
 max_values = np.array([7.2160087, 2.8161404, 40.3697])
+supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])
+supplementary_max_values = np.array([255, 255, 255, 255, 255, 1, 1000])
 
 def get_image(vv, vh, smooth=False):
     if smooth:
@@ -40,20 +42,16 @@ def add_supplementary(img, t):
     n_channels = img.shape[2]
     out = np.zeros((img.shape[0], img.shape[1], n_channels+7))
     out[:,:,:n_channels] = img
-    change = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-change")))), -1000, 1000)
-    extent = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-extent")))), -1000, 1000)
-    occurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-occurrence")))), -1000, 1000)
-    recurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-recurrence")))), -1000, 1000)
-    seasonality = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-seasonality")))), -1000, 1000)
-    transitions = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-transitions")))), -1000, 1000)
-    nasadem = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","nasadem")))), -1000, 1000)
-    out[:,:,n_channels] = change
-    out[:,:,n_channels+1] = extent
-    out[:,:,n_channels+2] = occurrence
-    out[:,:,n_channels+3] = recurrence
-    out[:,:,n_channels+4] = seasonality
-    out[:,:,n_channels+5] = transitions
-    out[:,:,n_channels+6] = nasadem
+    change = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-change")))), supplementary_min_values[0], supplementary_max_values[0])[:,:,None]
+    extent = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-extent")))), supplementary_min_values[1], supplementary_max_values[1])[:,:,None]
+    occurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-occurrence")))), supplementary_min_values[2], supplementary_max_values[2])[:,:,None]
+    recurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-recurrence")))), supplementary_min_values[3], supplementary_max_values[3])[:,:,None]
+    seasonality = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-seasonality")))), supplementary_min_values[4], supplementary_max_values[4])[:,:,None]
+    transitions = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-transitions")))), supplementary_min_values[5], supplementary_max_values[5])[:,:,None]
+    nasadem = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","nasadem")))), supplementary_min_values[6], supplementary_max_values[6])[:,:,None]
+    supplementary = np.concatenate((change, extent, occurrence, recurrence, seasonality, transitions, nasadem), axis=2)
+    supplementary = (supplementary - supplementary_min_values) / (supplementary_max_values - supplementary_min_values)
+    out[:,:,n_channels:] = supplementary
     return out
 
 def remove_outliers(img):
@@ -123,16 +121,8 @@ if __name__ == "__main__":
             _temp = np.squeeze(lab)
             background += np.sum(_temp == 0)
             floodwater += np.sum(_temp == 1)
-            mean = np.mean(img, axis=(0,1))
-            std = np.std(img, axis=(0,1))
-            means.append(mean)
-            stds.append(std)
         np.save(lab_out_fname, lab)
         np.save(out_fname, img)
 
-    means = np.asarray(means)
-    stds = np.asarray(stds)
-    print(f"\nMean: {np.mean(means, axis=0)}")
-    print(f"\nStandard Deviation: {np.mean(stds, axis=0)}")
     print(f"\nValidation Samples: {val_count}, Training Samples: {train_count}, Validation %: {(val_count/(val_count+train_count))*100:.2f}")
     print(f"\nBackground pixels: {background}, Flood pixels: {floodwater}, Ratio: {floodwater/background:.3f}")

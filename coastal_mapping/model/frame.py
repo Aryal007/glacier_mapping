@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
-import os
+import os, pdb
 from .metrics import *
 from .unet import *
 
@@ -46,7 +46,7 @@ class Framework:
                                              patience=5,
                                              factor = 0.5,
                                              min_lr = 1e-9)
-        self.lrscheduler2 = ExponentialLR(self.optimizer, 0.99, verbose=True)
+        self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
 
@@ -88,9 +88,9 @@ class Framework:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         model_path = Path(out_dir, f"model_{epoch}.pt")
-        optim_path = Path(out_dir, f"optim_{epoch}.pt")
+        #optim_path = Path(out_dir, f"optim_{epoch}.pt")
         torch.save(self.model.state_dict(), model_path)
-        torch.save(self.optimizer.state_dict(), optim_path)
+        #torch.save(self.optimizer.state_dict(), optim_path)
 
     def infer(self, x):
         """ Make a prediction for a given x
@@ -219,3 +219,8 @@ class Framework:
         optim_path = Path(out_dir, f"optim_best.h5")
         torch.save(self.model.state_dict(), model_path)
         torch.save(self.optimizer.state_dict(), optim_path)
+
+    def freeze_layers(self):
+        for i, layer in enumerate(self.model.parameters()):
+            if i < 60:
+                layer.requires_grad = False

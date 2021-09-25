@@ -14,10 +14,10 @@ from skimage.morphology import disk
 from skimage.filters import median
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-val_ids = ['pxs',  'jja', 'qxb']
+#val_ids = ['pxs',  'jja', 'qxb']
 #val_ids = ['kuo',  'tht', 'qus', 'coz', 'awc']
-#val_ids = ['hbe',  'tnp', 'wvy', 'ayt']
-model_id = "A"
+val_ids = ['hbe',  'tnp', 'wvy', 'ayt']
+model_id = "C"
 out_dir = "./validate"
 threshold = 0.5
 min_values = np.array([-33.510303, -39.171803, -182.45174])

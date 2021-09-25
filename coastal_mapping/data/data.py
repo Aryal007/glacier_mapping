@@ -80,12 +80,7 @@ class CoastalDataset(Dataset):
         img_path = self.img_files[index]
         mask_path = self.mask_files[index]
         data = np.load(img_path)
-        data = data[:,:,self.use_channels]   
-        mean = np.asarray([0, 0, 0, 0, 0, 0, 2.37727581e+02,  1.16154985e-01, 3.88715533e+00,  8.37096320e+00,  4.68160939e-01,  6.28892115e-01, 1.33995571e+02])
-        std = np.asarray([1, 1, 1, 1, 1, 1, 2.32348803e+01, 1.68062603e-01, 6.81500199e+00, 1.33751492e+01, 9.39534473e-01, 1.09440426e+00, 1.85979696e+01])
-        mean = mean[self.use_channels]   
-        std = std[self.use_channels]   
-        data = (data - mean) / std
+        data = data[:,:,self.use_channels]  
         if self.normalize:
             data = (data - self.mean) / self.std
         label = np.load(mask_path)
