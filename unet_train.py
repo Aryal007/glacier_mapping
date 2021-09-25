@@ -21,6 +21,7 @@ if __name__ == "__main__":
     conf = Dict(yaml.safe_load(open('./conf/unet_train.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
     class_name = conf.class_name
+    run_name = conf.run_name
     processed_dir = data_dir / "processed"
     loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels)
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)            
@@ -31,10 +32,24 @@ if __name__ == "__main__":
         reg_opts=conf.reg_opts
     )
 
+    if conf.fine_tune:
+        print(f"Finetuning the model")
+        run_name = conf.run_name+"_finetuned"
+        model_path = f"{data_dir}/runs/{conf.run_name}/models/model_final.pt"
+        optim_path = f"{data_dir}/runs/{conf.run_name}/models/optim_final.pt"
+        if torch.cuda.is_available():
+            state_dict = torch.load(model_path)
+            optim_state_dict = torch.load(optim_path)
+        else:
+            state_dict = torch.load(model_path, map_location="cpu")
+            optim_state_dict = torch.load(optim_state_dict, map_location="cpu")
+        frame.load_state_dict(state_dict)
+        frame.optim_load_state_dict(state_dict)
+
     # Setup logging
-    writer = SummaryWriter(f"{data_dir}/runs/{conf.run_name}/logs/")
+    writer = SummaryWriter(f"{data_dir}/runs/{run_name}/logs/")
     writer.add_text("Configuration Parameters", json.dumps(conf))
-    out_dir = f"{data_dir}/runs/{conf.run_name}/models/"
+    out_dir = f"{data_dir}/runs/{run_name}/models/"
     val_loss = np.inf
 
     for epoch in range(conf.epochs):
@@ -55,7 +70,7 @@ if __name__ == "__main__":
         # Save model
         if epoch % conf.save_every == 0:
             frame.save(out_dir, epoch)
-        if conf.epochs - epoch <= 5:
+        if conf.epochs - epoch <= 3:
             frame.save(out_dir, epoch)
 
         print(f"{epoch+1}/{conf.epochs} | train_loss: {loss['train']:.5f} \

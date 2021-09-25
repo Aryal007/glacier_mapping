@@ -10,59 +10,101 @@ from coastal_mapping.model.metrics import *
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import PrecisionRecallDisplay
 import matplotlib.pyplot as plt
-from skimage.filters import gaussian
+from skimage.morphology import disk
+from skimage.filters import median
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-val_ids = ['kno',  'psx', 'qxb', 'tht']
-model_id = "I"
+val_ids = ['pxs',  'jja', 'qxb']
+#val_ids = ['kuo',  'tht', 'qus', 'coz', 'awc']
+#val_ids = ['hbe',  'tnp', 'wvy', 'ayt']
+model_id = "A"
 out_dir = "./validate"
-threshold = 0.65
+threshold = 0.5
+min_values = np.array([-33.510303, -39.171803, -182.45174])
+max_values = np.array([7.2160087, 2.8161404, 40.3697])
+
+def get_image(vv, vh, smooth=False):
+    if smooth:
+        vv = median(vv, disk(2))
+        vh = median(vh, disk(2))
+    blue = np.nan_to_num(vv / vh)
+    img = np.concatenate((np.clip(vv[:,:,None], min_values[0], max_values[0]), 
+                        np.clip(vh[:,:,None], min_values[1], max_values[1]), 
+                        np.clip(blue[:,:,None], min_values[2], max_values[2])), 
+                        axis=2)
+    return img
+
+def add_rsi(img):
+    out = np.zeros((img.shape[0], img.shape[1], 6))
+    out[:,:,:3] = img
+    vv = img[:,:,0]
+    vh = img[:,:,1]
+    blue = img[:,:,2]
+    nprb = np.clip(np.nan_to_num((vv - vh) / (vv + vh)), -1, 1)
+    bi = np.sqrt(np.square(vv)+np.square(vh)+np.square(blue))/3
+    ndwi = np.clip(np.nan_to_num((blue - vv - vh) / (blue + vv + vh)), -1, 1)
+    out[:,:,3] = nprb
+    out[:,:,4] = bi
+    out[:,:,5] = ndwi
+    return out
 
 def get_model(model_id: str):
     """
     Return model parameter and weights
     """
     conf = Dict(yaml.safe_load(open('./codeexecution/assets/conf.yaml'))) 
-    model_path = f"./codeexecution/assets/model_{model_id}.h5"
+    model_path = f"./codeexecution/assets/model_{model_id}.pt"
     frame = Framework(model_opts=conf.model_opts)
     state_dict = torch.load(model_path, map_location="cpu")
     frame.load_state_dict(state_dict)
     return frame
 
+def add_supplementary(img, chip_id):
+    n_channels = img.shape[2]
+    out = np.zeros((img.shape[0], img.shape[1], n_channels+7))
+    out[:,:,:n_channels] = img
+    change = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-change.tif")), -1000, 1000)
+    extent = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-extent.tif")), -1000, 1000)
+    occurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-occurrence.tif")), -1000, 1000)
+    recurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-recurrence.tif")), -1000, 1000)
+    seasonality = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-seasonality.tif")), -1000, 1000)
+    transitions = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-transitions.tif")), -1000, 1000)
+    nasadem = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_nasadem.tif")), -1000, 1000)
+    out[:,:,n_channels] = change
+    out[:,:,n_channels+1] = extent
+    out[:,:,n_channels+2] = occurrence
+    out[:,:,n_channels+3] = recurrence
+    out[:,:,n_channels+4] = seasonality
+    out[:,:,n_channels+5] = transitions
+    out[:,:,n_channels+6] = nasadem
+    return out
+
+def remove_outliers(img):
+    mean = np.mean(img, axis=(0,1))
+    std = np.std(img, axis=(0,1))
+    img = np.clip(img, mean-3*std, mean+3*std)
+    return img
+
+def min_max(img):
+    img = (img - min_values) / (max_values - min_values)
+    img[:,:,2] = img[:,:,2]/1.5
+    return img
 
 def get_inp_image(chip_id: str):
     """
     Given an image ID, return numpy image for prediction
     """
-    arr_vh = imread(f"./data/train_features/{chip_id}_vh.tif")
-    arr_vv = imread(f"./data/train_features/{chip_id}_vv.tif")
-    arr_change = imread(f"./data/train_features/{chip_id}_jrc-gsw-change.tif")
-    arr_extent = imread(f"./data/train_features/{chip_id}_jrc-gsw-extent.tif")
-    arr_occurrence = imread(f"./data/train_features/{chip_id}_jrc-gsw-occurrence.tif")
-    arr_recurrence = imread(f"./data/train_features/{chip_id}_jrc-gsw-recurrence.tif")
-    arr_seasonality = imread(f"./data/train_features/{chip_id}_jrc-gsw-seasonality.tif")
-    arr_transitions = imread(f"./data/train_features/{chip_id}_jrc-gsw-transitions.tif")
-    arr_nasadem = imread(f"./data/train_features/{chip_id}_nasadem.tif")
-    # TODO: this is the main work! it is your job to implement this
-    vv = np.expand_dims(gaussian(arr_vv, sigma=1.5), axis=2)
-    vv_minmax = (vv - np.min(vv)) / (np.max(vv) - np.min(vv))
-    vh = np.expand_dims(gaussian(arr_vh, sigma=1.5), axis=2)
-    vh_minmax = (vh - np.min(vh)) / (np.max(vh) - np.min(vh))
-    add_minmax = vv_minmax + vh_minmax
-    mul_minmax = vv_minmax * vh_minmax
-    nprb = (vv_minmax - vh_minmax + 2) / (vv_minmax + vh_minmax + 2)
-    change = np.expand_dims(arr_change, axis=2)
-    extent = np.expand_dims(arr_extent, axis=2)
-    occurrence = np.expand_dims(arr_occurrence, axis=2)
-    recurrence = np.expand_dims(arr_recurrence, axis=2)
-    seasonality = np.expand_dims(arr_seasonality, axis=2)
-    transitions = np.expand_dims(arr_transitions, axis=2)
-    nasadem = np.expand_dims(arr_nasadem, axis=2)
-    inp =  np.concatenate((vv,vh,vv_minmax,vh_minmax,add_minmax,mul_minmax,nprb,change,extent,occurrence,recurrence,seasonality,transitions,nasadem), axis=2)
-    mean = np.asarray([-10.775323, -17.547888, 0.50388277, 0.52909607, 1.0329787, 0.29140142, 0.66001433, 236.96355, 3.4183776, 8.270104, 12.422075, 3.9184833, 0.58966357, 151.06439])
-    std = np.asarray([2.8078806, 3.145529, 0.11285119, 0.1308618, 0.22676097, 0.11502454, 0.06593883, 20.920994, 0.19825858, 6.3861856, 12.3026, 0.94436866, 0.9797459, 17.214708])
-    inp = (inp - mean) / std
-    x = np.expand_dims(inp, axis=0)
+    vv = imread(f"./data/train_features/{chip_id}_vv.tif")
+    vh = imread(f"./data/train_features/{chip_id}_vh.tif")
+    img = get_image(vv, vh, smooth=True)
+    img = remove_outliers(img)
+    img = min_max(img)
+    img = add_rsi(img)
+    img = add_supplementary(img, chip_id)
+    mean = np.asarray([0, 0, 0, 0, 0, 0, 2.38835277e+02,  4.99138411e+00, 1.00591349e+01,  1.33289707e+01,  5.55549108e+00,  4.80441443e-01, 1.59747973e+02])
+    std = np.asarray([1, 1, 1, 1, 1, 1, 1.73011714e+01, 1.99187397e-01, 5.91402628e+00, 1.07402841e+01, 9.28329093e-01, 8.09007041e-01, 1.34626650e+01])
+    img = (img - mean) / std
+    x = np.expand_dims(img, axis=0)
     x = torch.from_numpy(x).float()
     return x
 
@@ -103,22 +145,39 @@ if __name__ == "__main__":
     for chip_id in tqdm(ids, miniters=25, file=sys.stdout, leave=True):
         logger.info(f"Generating predictions for {chip_id} ...")
         x = get_inp_image(chip_id)
-        y = get_gt(chip_id)
         pred = get_prediction(model, x)
+        y = get_gt(chip_id)
         pred[y == 255] = 0
         y[y == 255] = 0
+        orig_pred = pred
         y_test = np.concatenate((y_test, y.flatten().numpy()))
         y_score = np.concatenate((y_score, pred.flatten().numpy()))
         pred = pred > threshold
         pred = pred.numpy()
-        pred = remove_small_objects(pred, min_size = 5, connectivity=2)
-        pred = remove_small_holes(pred, area_threshold = 5, connectivity=2)
+        pred = remove_small_holes(pred, area_threshold = 50, connectivity=2)
+        pred = remove_small_objects(pred, min_size = 50, connectivity=2)    
+        fig, ax = plt.subplots(2,2)
+        ax[0,0].set_title('RGB Image')
+        ax[0,0].imshow(x.numpy()[0][:,:,:3])
+        ax[0,1].set_title('Labels')
+        ax[0,1].imshow(y, cmap="gray")
+        ax[1,0].set_title('Prediction')
+        ax[1,0].imshow(orig_pred, cmap="gray")
+        ax[1,1].set_title('Processed prediction')
+        ax[1,1].imshow(pred, cmap="gray")
+        ax[0,0].axis('off')
+        ax[0,1].axis('off')
+        ax[1,0].axis('off')
+        ax[1,1].axis('off')
         pred = torch.from_numpy(pred).type(torch.int8)
+        #pred = pred.type(torch.int8)
         _tp, _fp, _fn = tp_fp_fn(pred, y)
         _recall = recall(_tp, _fp, _fn)
         _dice = dice(_tp, _fp, _fn)
         _precision = precision(_tp, _fp, _fn)
         _IoU = IoU(_tp, _fp, _fn)
+        fig.suptitle(f'Dice: {_dice:.3f}, IoU: {_IoU:.3f}')
+        plt.savefig(f"./validate/images/{chip_id}_{model_id}.png")
         new_row = {'chip_id':chip_id, 'tp':_tp, 'fp':_fp, 'fn':_fn,
                    'precision':_precision, 'recall':_recall, 'dice':_dice, 'IoU':_IoU}
         df = df.append(new_row, ignore_index=True)

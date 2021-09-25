@@ -1,20 +1,15 @@
 from pathlib import Path
 import numpy as np
 import glob, os, shutil, yaml
-from tifffile import imsave
+from tifffile import imsave, imread
 import rasterio, pdb
 import matplotlib.pyplot as plt
 from skimage.morphology import disk
 from skimage.filters import median
 
-val_ids = ['pxs', 'jja', 'qxb']
+val_ids = ['hbe', 'tnp', 'wvy', 'ayt']
 min_values = np.array([-33.510303, -39.171803, -182.45174])
 max_values = np.array([7.2160087, 2.8161404, 40.3697])
-
-def imread(f):
-    tiff = rasterio.open(f)
-    tiff_np = tiff.read()
-    return tiff_np
 
 def get_image(vv, vh, smooth=False):
     if smooth:
@@ -45,13 +40,13 @@ def add_supplementary(img, t):
     n_channels = img.shape[2]
     out = np.zeros((img.shape[0], img.shape[1], n_channels+7))
     out[:,:,:n_channels] = img
-    change = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-change"))))), -1000, 1000)
-    extent = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-extent"))))), -1000, 1000)
-    occurrence = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-occurrence"))))), -1000, 1000)
-    recurrence = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-recurrence"))))), -1000, 1000)
-    seasonality = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-seasonality"))))), -1000, 1000)
-    transitions = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","jrc-gsw-transitions"))))), -1000, 1000)
-    nasadem = np.clip(np.nan_to_num(np.squeeze(imread(Path(str(t).replace("vv","nasadem"))))), -1000, 1000)
+    change = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-change")))), -1000, 1000)
+    extent = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-extent")))), -1000, 1000)
+    occurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-occurrence")))), -1000, 1000)
+    recurrence = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-recurrence")))), -1000, 1000)
+    seasonality = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-seasonality")))), -1000, 1000)
+    transitions = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","jrc-gsw-transitions")))), -1000, 1000)
+    nasadem = np.clip(np.nan_to_num(imread(Path(str(t).replace("vv","nasadem")))), -1000, 1000)
     out[:,:,n_channels] = change
     out[:,:,n_channels+1] = extent
     out[:,:,n_channels+2] = occurrence
@@ -97,14 +92,13 @@ if __name__ == "__main__":
             if val_id in str(l):
                 flag = 1
 
-        lab = imread(l)
-        lab = lab.transpose((1,2,0))
-        vv = np.squeeze(imread(vv_filename))
+        lab = imread(l)[:,:,None]
+        vv = imread(vv_filename)
         mask = np.zeros_like(np.squeeze(vv))
         with rasterio.open(t) as img:
             vv_numpy_mask = img.read(1, masked=True)
         lab[vv_numpy_mask.mask] = 255
-        vh = np.squeeze(imread(vh_filename))
+        vh = imread(vh_filename)
         with rasterio.open(vh_filename) as img:
             vh_numpy_mask = img.read(1, masked=True)
         lab[vh_numpy_mask.mask] = 255

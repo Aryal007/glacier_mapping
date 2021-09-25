@@ -1,9 +1,9 @@
 data_dir: "/home/aryal007/DynamicEarthNet/Track2/data/"
 class_name: "Floodwater"
 batch_size: 1
-run_name: "final_A_small"
+run_name: "final_C_small"
 epochs: 76
-save_every: 25
+save_every: 50
 use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 loss_opts:
   name: "dice"
@@ -26,5 +26,6 @@ log_opts:
   mask_names: ["XBackground", "Floodwater"]
 metrics_opts: ["IoU", "precision", "recall"]
 grad_accumulation_steps: None
+fine_tune: False
 reg_opts:
   l1_reg: 0.00001

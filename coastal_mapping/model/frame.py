@@ -200,6 +200,9 @@ class Framework:
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
 
+    def optim_load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict)
+
     def load_best(self, model_path):
         print(f"Validation loss higher than previous for 3 steps, loading previous state")
         if torch.cuda.is_available():
