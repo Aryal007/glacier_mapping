@@ -6,6 +6,8 @@ import rasterio, pdb
 import matplotlib.pyplot as plt
 from scipy.ndimage.filters import uniform_filter
 from scipy.ndimage.measurements import variance
+from skimage.filters import median
+from skimage.morphology import disk
 
 def lee_filter(img, size):
     img_mean = uniform_filter(img, (size, size))
@@ -27,11 +29,12 @@ supplementary_max_values = np.array([255, 255, 255, 255, 255, 1, 1000])
 def get_image(vv, vh, smooth=False):
     img = np.concatenate((vv[:,:,None], vh[:,:,None]), axis=2)
     img = min_max(img)
-    blue = np.clip(np.nan_to_num(np.log(img[:,:,0]) / np.log(img[:,:,1])), 0, 1)
-    img = np.concatenate((img, blue[:,:,None]), axis=2)
     if smooth:
         for i in range(img.shape[2]):
-            img[:,:,i] = lee_filter(img[:,:,i], 20)
+            img[:,:,i] = lee_filter(img[:,:,i], smooth)
+            img[:,:,i] = median(img[:,:,i], disk(3))
+    blue = (np.clip(np.nan_to_num(vv / vh), 0.5, 2) - 0.5) / 1.5
+    img = np.concatenate((img, blue[:,:,None]), axis=2)
     return img
 
 def add_rsi(img):
@@ -70,7 +73,7 @@ def min_max(img):
 
 if __name__ == "__main__":
     data_dir = Path("./data")
-    smooth = 3
+    smooth = 20
     features_dir = data_dir / "train_features"
     labels_dir = data_dir / "train_labels"
     if not os.path.exists(data_dir / "processed"):
