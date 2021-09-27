@@ -48,11 +48,13 @@ class UpBlock(nn.Module):
         self.upconv = nn.ConvTranspose2d(
             inchannels, outchannels, kernel_size=kernel_size, stride=stride
         )
+        self.skipconv = nn.Conv2d(outchannels, outchannels, kernel_size=3, padding=1)
         if dropout > 0:
             self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
 
     def forward(self, x, skips):
         x = self.upconv(x)
+        skips = self.skipconv(skips)
         x = torch.cat([skips, x], 1)
         return self.conv(x)
 
