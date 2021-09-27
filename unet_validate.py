@@ -12,16 +12,19 @@ from sklearn.metrics import PrecisionRecallDisplay
 import matplotlib.pyplot as plt
 from skimage.morphology import disk
 from skimage.filters import median
+from skimage import exposure
 from skimage.morphology import remove_small_objects, remove_small_holes
 
-#val_ids = ['pxs',  'jja', 'qxb']
+val_ids = ['pxs',  'jja', 'qxb']
 #val_ids = ['kuo',  'tht', 'qus', 'coz', 'awc']
-val_ids = ['hbe',  'tnp', 'wvy', 'ayt']
-model_id = "C"
+#val_ids = ['hbe',  'tnp', 'wvy', 'ayt']
+model_id = "A"
 out_dir = "./validate"
 threshold = 0.5
 min_values = np.array([-33.510303, -39.171803, -182.45174])
 max_values = np.array([7.2160087, 2.8161404, 40.3697])
+supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])
+supplementary_max_values = np.array([255, 255, 255, 255, 255, 1, 1000])
 
 def get_image(vv, vh, smooth=False):
     if smooth:
@@ -63,20 +66,16 @@ def add_supplementary(img, chip_id):
     n_channels = img.shape[2]
     out = np.zeros((img.shape[0], img.shape[1], n_channels+7))
     out[:,:,:n_channels] = img
-    change = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-change.tif")), -1000, 1000)
-    extent = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-extent.tif")), -1000, 1000)
-    occurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-occurrence.tif")), -1000, 1000)
-    recurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-recurrence.tif")), -1000, 1000)
-    seasonality = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-seasonality.tif")), -1000, 1000)
-    transitions = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-transitions.tif")), -1000, 1000)
-    nasadem = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_nasadem.tif")), -1000, 1000)
-    out[:,:,n_channels] = change
-    out[:,:,n_channels+1] = extent
-    out[:,:,n_channels+2] = occurrence
-    out[:,:,n_channels+3] = recurrence
-    out[:,:,n_channels+4] = seasonality
-    out[:,:,n_channels+5] = transitions
-    out[:,:,n_channels+6] = nasadem
+    change = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-change.tif")), supplementary_min_values[0], supplementary_max_values[0])[:,:,None]
+    extent = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-extent.tif")), supplementary_min_values[1], supplementary_max_values[1])[:,:,None]
+    occurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-occurrence.tif")), supplementary_min_values[2], supplementary_max_values[2])[:,:,None]
+    recurrence = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-recurrence.tif")), supplementary_min_values[3], supplementary_max_values[3])[:,:,None]
+    seasonality = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-seasonality.tif")), supplementary_min_values[4], supplementary_max_values[4])[:,:,None]
+    transitions = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_jrc-gsw-transitions.tif")), supplementary_min_values[5], supplementary_max_values[5])[:,:,None]
+    nasadem = np.clip(np.nan_to_num(imread(f"./data/train_features/{chip_id}_nasadem.tif")), supplementary_min_values[6], supplementary_max_values[6])[:,:,None]
+    supplementary = np.concatenate((change, extent, occurrence, recurrence, seasonality, transitions, nasadem), axis=2)
+    supplementary = (supplementary - supplementary_min_values) / (supplementary_max_values - supplementary_min_values)
+    out[:,:,n_channels:] = supplementary
     return out
 
 def remove_outliers(img):
@@ -101,9 +100,6 @@ def get_inp_image(chip_id: str):
     img = min_max(img)
     img = add_rsi(img)
     img = add_supplementary(img, chip_id)
-    mean = np.asarray([0, 0, 0, 0, 0, 0, 2.38835277e+02,  4.99138411e+00, 1.00591349e+01,  1.33289707e+01,  5.55549108e+00,  4.80441443e-01, 1.59747973e+02])
-    std = np.asarray([1, 1, 1, 1, 1, 1, 1.73011714e+01, 1.99187397e-01, 5.91402628e+00, 1.07402841e+01, 9.28329093e-01, 8.09007041e-01, 1.34626650e+01])
-    img = (img - mean) / std
     x = np.expand_dims(img, axis=0)
     x = torch.from_numpy(x).float()
     return x
@@ -152,8 +148,8 @@ if __name__ == "__main__":
         orig_pred = pred
         y_test = np.concatenate((y_test, y.flatten().numpy()))
         y_score = np.concatenate((y_score, pred.flatten().numpy()))
-        pred = pred > threshold
         pred = pred.numpy()
+        pred = pred > threshold
         pred = remove_small_holes(pred, area_threshold = 50, connectivity=2)
         pred = remove_small_objects(pred, min_size = 50, connectivity=2)    
         fig, ax = plt.subplots(2,2)

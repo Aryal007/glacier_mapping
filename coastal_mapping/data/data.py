@@ -26,12 +26,11 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     normalize = False
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
                                     transforms = transforms.Compose([
-                                               DropoutChannels(0.3),
+                                               DropoutChannels(1),
                                                FlipHorizontal(0.3),
                                                FlipVertical(0.3),
                                                Rot270(0.3),
-                                               Cut(0.3),
-                                               #ElasticDeform(0.2)
+                                               Cut(0.3)
                                            ]))
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
     
@@ -213,6 +212,6 @@ class DropoutChannels(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            rand_channel_index = np.random.randint(low = 2, high = data.shape[2], size=(1,2))[0]
+            rand_channel_index = np.random.randint(low = 2, high = data.shape[2], size=(1,10))[0]
             data[:, :, rand_channel_index] = 0
         return {'image': data, 'mask': label}

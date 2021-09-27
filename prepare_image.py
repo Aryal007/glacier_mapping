@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from skimage.morphology import disk
 from skimage.filters import median
 
-val_ids = ['qxb']
+val_ids = ['ayt']
 min_values = np.array([-33.510303, -39.171803, -182.45174])
 max_values = np.array([7.2160087, 2.8161404, 40.3697])
 supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])

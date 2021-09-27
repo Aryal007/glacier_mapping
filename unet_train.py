@@ -63,9 +63,9 @@ if __name__ == "__main__":
         loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts, conf.loss_masked)
         fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
 
-        if epoch % 5 == 0:
-            fn.log_images(writer, frame, loaders["train"], epoch, "train")
-            fn.log_images(writer, frame, loaders["val"], epoch, "val")
+        #if epoch % 5 == 0:
+        fn.log_images(writer, frame, loaders["train"], epoch, "train")
+        fn.log_images(writer, frame, loaders["val"], epoch, "val")
 
         writer.add_scalars("Loss", loss, epoch)
         # Save model
