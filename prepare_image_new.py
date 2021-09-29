@@ -20,7 +20,7 @@ def lee_filter(img, size):
     img_output = img_mean + img_weights * (img - img_mean)
     return img_output
 
-val_ids = ['pxs', 'jja', 'qxb']
+val_ids = ['hbe', 'qxb']
 min_values = np.array([-33.510303, -39.171803])
 max_values = np.array([7.2160087, 2.8161404])
 supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])
@@ -33,7 +33,7 @@ def get_image(vv, vh, smooth=False):
         for i in range(img.shape[2]):
             img[:,:,i] = lee_filter(img[:,:,i], smooth)
             img[:,:,i] = median(img[:,:,i], disk(3))
-    blue = (np.clip(np.nan_to_num(vv / vh), 0.5, 2) - 0.5) / 1.5
+    blue = np.clip(np.nan_to_num(vv / vh), 0, 2) / 2
     img = np.concatenate((img, blue[:,:,None]), axis=2)
     return img
 
