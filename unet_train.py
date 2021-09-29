@@ -36,16 +36,12 @@ if __name__ == "__main__":
         print(f"Finetuning the model")
         run_name = conf.run_name+"_finetuned"
         model_path = f"{data_dir}/runs/{conf.run_name}/models/model_final.pt"
-        optim_path = f"{data_dir}/runs/{conf.run_name}/models/optim_final.pt"
         if torch.cuda.is_available():
             state_dict = torch.load(model_path)
-            #optim_state_dict = torch.load(optim_path)
         else:
             state_dict = torch.load(model_path, map_location="cpu")
-            #optim_state_dict = torch.load(optim_state_dict, map_location="cpu")
         frame.load_state_dict(state_dict)
         frame.freeze_layers()
-        #frame.optim_load_state_dict(state_dict)
 
     # Setup logging
     writer = SummaryWriter(f"{data_dir}/runs/{run_name}/logs/")

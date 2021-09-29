@@ -20,7 +20,7 @@ def lee_filter(img, size):
     img_output = img_mean + img_weights * (img - img_mean)
     return img_output
 
-val_ids = ['hbe', 'qxb']
+val_ids = ['jja', 'awc', 'coz']
 min_values = np.array([-33.510303, -39.171803])
 max_values = np.array([7.2160087, 2.8161404])
 supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])
@@ -28,12 +28,13 @@ supplementary_max_values = np.array([255, 255, 255, 255, 255, 1, 1000])
 
 def get_image(vv, vh, smooth=False):
     img = np.concatenate((vv[:,:,None], vh[:,:,None]), axis=2)
-    img = min_max(img)
+    #img = min_max(img)
+    img = (img - min_values) / max_values
     if smooth:
         for i in range(img.shape[2]):
             img[:,:,i] = lee_filter(img[:,:,i], smooth)
             img[:,:,i] = median(img[:,:,i], disk(3))
-    blue = np.clip(np.nan_to_num(vv / vh), 0, 2) / 2
+    blue = np.clip(np.nan_to_num(vv / vh), 0, 1000)
     img = np.concatenate((img, blue[:,:,None]), axis=2)
     return img
 
@@ -43,9 +44,9 @@ def add_rsi(img):
     vv = img[:,:,0]
     vh = img[:,:,1]
     blue = img[:,:,2]
-    nprb = np.clip(np.nan_to_num(np.exp(vv - vh) / np.exp(vv + vh)), -1, 1)
+    nprb = np.clip(np.nan_to_num((vv - vh) / (vv + vh)), -1000, 1000)
     bi = np.sqrt(np.square(vv + vh + blue))/3
-    ndwi = np.clip(np.nan_to_num(np.exp(blue - vv - vh) / np.exp(blue + vv + vh)), -1, 1)
+    ndwi = np.clip(np.nan_to_num((blue - vh) / (blue + vh)), -1000, 1000)
     out[:,:,3] = nprb
     out[:,:,4] = bi
     out[:,:,5] = ndwi
@@ -67,9 +68,9 @@ def add_supplementary(img, t):
     out[:,:,n_channels:] = supplementary
     return out
 
-def min_max(img):
-    img = (img - min_values) / (max_values - min_values)
-    return img
+#def min_max(img):
+#    img = (img - min_values) / (max_values - min_values)
+#    return img
 
 if __name__ == "__main__":
     data_dir = Path("./data")

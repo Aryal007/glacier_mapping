@@ -222,5 +222,5 @@ class Framework:
 
     def freeze_layers(self):
         for i, layer in enumerate(self.model.parameters()):
-            if i < 60:
+            if i < 60: # Freeze 60 out of 75 layers, retrain on last 15 only
                 layer.requires_grad = False
