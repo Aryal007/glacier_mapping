@@ -1,0 +1,14 @@
+processed_dir: "/mnt/datadrive/noaa/test_images/processed/"
+model: "unet"
+model_opts:
+  args: 
+    inchannels: 7
+    outchannels: 2
+    net_depth: 5
+    dropout: 0.3
+    spatial: True
+    first_channel_output: 4
+run_name: "7_channels"
+model_dir: "/mnt/datadrive/noaa/"
+out_dir: "/mnt/datadrive/noaa/test_images/preds/"
+use_channels: [0,1,2,3,4,5,6]

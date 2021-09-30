@@ -22,6 +22,7 @@ class ConvBlock(nn.Module):
     """
     def __init__(self, inchannels, outchannels, dropout, spatial, kernel_size=3, padding=1):
         super().__init__()
+        self.outchannels = outchannels
         self.conv1 = nn.Conv2d(inchannels, outchannels, kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv2d(outchannels, outchannels, kernel_size=kernel_size, padding=padding)
         if dropout > 0:
@@ -32,7 +33,9 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
+        x = self.dropout(x)
         x = F.relu(self.conv2(x))
+        x = self.dropout(x)
         return x
 
 

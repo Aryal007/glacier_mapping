@@ -164,10 +164,9 @@ def log_images(writer, frame, batch, epoch, stage):
 
     y = _y
     y_hat = _y_hat
-
-    x = x.cpu().numpy()
-    x = (x - np.min(x, axis=(0,1))) / (np.max(x, axis=(0,1)) - np.min(x, axis=(0,1)))
-    x = torch.from_numpy(x)
+    
+    x[:,:,:,2] = x[:,:,:,2] / 2
+    x = torch.clamp(x, 0, 1)
     writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
     writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)    
     writer.add_image(f"{stage}/y_hat", make_grid(pm(squash(torch.tensor(y_hat)))), epoch)

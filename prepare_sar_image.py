@@ -4,24 +4,37 @@ import glob, os, shutil, yaml
 from tifffile import imsave, imread
 import rasterio, pdb
 import matplotlib.pyplot as plt
-from skimage.morphology import disk
+from scipy.ndimage.filters import uniform_filter
+from scipy.ndimage.measurements import variance
 from skimage.filters import median
+from skimage.morphology import disk
 
-val_ids = ['ayt']
-min_values = np.array([-33.510303, -39.171803, -182.45174])
-max_values = np.array([7.2160087, 2.8161404, 40.3697])
+def lee_filter(img, size):
+    img_mean = uniform_filter(img, (size, size))
+    img_sqr_mean = uniform_filter(img**2, (size, size))
+    img_variance = img_sqr_mean - img_mean**2
+
+    overall_variance = variance(img)
+
+    img_weights = img_variance / (img_variance + overall_variance)
+    img_output = img_mean + img_weights * (img - img_mean)
+    return img_output
+
+val_ids = ['qus', 'ayt', 'pxs']
+min_values = np.array([-33.510303, -39.171803])
+max_values = np.array([7.2160087, 2.8161404])
 supplementary_min_values = np.array([0, 0, 0, 0, 0, 0, 0])
 supplementary_max_values = np.array([255, 255, 255, 255, 255, 1, 1000])
 
 def get_image(vv, vh, smooth=False):
+    img = np.concatenate((vv[:,:,None], vh[:,:,None]), axis=2)
+    img = min_max(img)
     if smooth:
-        vv = median(vv, disk(2))
-        vh = median(vh, disk(2))
-    blue = np.nan_to_num(vv / vh)
-    img = np.concatenate((np.clip(vv[:,:,None], min_values[0], max_values[0]), 
-                        np.clip(vh[:,:,None], min_values[1], max_values[1]), 
-                        np.clip(blue[:,:,None], min_values[2], max_values[2])), 
-                        axis=2)
+        for i in range(img.shape[2]):
+            img[:,:,i] = lee_filter(img[:,:,i], smooth)
+            img[:,:,i] = median(img[:,:,i], disk(3))
+    blue = np.clip(np.nan_to_num(vv / vh), 0, 1000)
+    img = np.concatenate((img, blue[:,:,None]), axis=2)
     return img
 
 def add_rsi(img):
@@ -30,9 +43,9 @@ def add_rsi(img):
     vv = img[:,:,0]
     vh = img[:,:,1]
     blue = img[:,:,2]
-    nprb = np.clip(np.nan_to_num((vv - vh) / (vv + vh)), -1, 1)
-    bi = np.sqrt(np.square(vv)+np.square(vh)+np.square(blue))/3
-    ndwi = np.clip(np.nan_to_num((blue - vv - vh) / (blue + vv + vh)), -1, 1)
+    nprb = np.clip(np.nan_to_num((vv - vh) / (vv + vh)), -1000, 1000)
+    bi = np.sqrt(np.square(vv + vh + blue))/3
+    ndwi = np.clip(np.nan_to_num((blue - vh) / (blue + vh)), -1000, 1000)
     out[:,:,3] = nprb
     out[:,:,4] = bi
     out[:,:,5] = ndwi
@@ -54,19 +67,14 @@ def add_supplementary(img, t):
     out[:,:,n_channels:] = supplementary
     return out
 
-def remove_outliers(img):
-    mean = np.mean(img, axis=(0,1))
-    std = np.std(img, axis=(0,1))
-    img = np.clip(img, mean-3*std, mean+3*std)
-    return img
-
 def min_max(img):
     img = (img - min_values) / (max_values - min_values)
-    img[:,:,2] = img[:,:,2]/1.5
+    #img = (img - min_values) / max_values 
     return img
 
 if __name__ == "__main__":
     data_dir = Path("./data")
+    smooth = 20
     features_dir = data_dir / "train_features"
     labels_dir = data_dir / "train_labels"
     if not os.path.exists(data_dir / "processed"):
@@ -89,25 +97,17 @@ if __name__ == "__main__":
         for val_id in val_ids:
             if val_id in str(l):
                 flag = 1
-
         lab = imread(l)[:,:,None]
-        vv = imread(vv_filename)
+        vv = np.clip(np.nan_to_num(imread(vv_filename)), min_values[0], max_values[0])
         mask = np.zeros_like(np.squeeze(vv))
         with rasterio.open(t) as img:
             vv_numpy_mask = img.read(1, masked=True)
         lab[vv_numpy_mask.mask] = 255
-        vh = imread(vh_filename)
+        vh = np.clip(np.nan_to_num(imread(vh_filename)), min_values[1], max_values[1])
         with rasterio.open(vh_filename) as img:
             vh_numpy_mask = img.read(1, masked=True)
         lab[vh_numpy_mask.mask] = 255
-
-        if flag:
-            img = get_image(vv, vh, smooth=True)
-        else:
-            img = get_image(vv, vh, smooth=True)
-
-        img = remove_outliers(img)
-        img = min_max(img)
+        img = get_image(vv, vh, smooth=3)
         img = add_rsi(img)
         img = add_supplementary(img, t)
         if flag:
@@ -123,6 +123,5 @@ if __name__ == "__main__":
             floodwater += np.sum(_temp == 1)
         np.save(lab_out_fname, lab)
         np.save(out_fname, img)
-
     print(f"\nValidation Samples: {val_count}, Training Samples: {train_count}, Validation %: {(val_count/(val_count+train_count))*100:.2f}")
     print(f"\nBackground pixels: {background}, Flood pixels: {floodwater}, Ratio: {floodwater/background:.3f}")
