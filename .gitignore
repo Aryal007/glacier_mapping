@@ -6,3 +6,6 @@ unet_predict.py
 *.png
 conf/unet_predict.yaml
 *.csv
+data/*
+codeexecution/*
+images/*

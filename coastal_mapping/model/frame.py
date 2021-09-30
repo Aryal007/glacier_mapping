@@ -13,11 +13,10 @@ training step can be concisely called with a single method.
 from pathlib import Path
 import torch
 import numpy as np
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-import os
+from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
+import os, pdb
 from .metrics import *
 from .unet import *
-import pdb
 
 class Framework:
     """
@@ -43,8 +42,11 @@ class Framework:
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
-                                             verbose=True, patience=5,
-                                             min_lr=1e-6)
+                                             verbose = True, 
+                                             patience=15,
+                                             factor = 0.75,
+                                             min_lr = 1e-9)
+        self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
 
@@ -61,18 +63,22 @@ class Framework:
         x = x.permute(0, 3, 1, 2).to(self.device)
         y = y.permute(0, 3, 1, 2).to(self.device)
 
-        self.optimizer.zero_grad()
         y_hat = self.model(x)
         
         loss = self.calc_loss(y_hat, y)
         loss.backward()
+        return y_hat.permute(0, 2, 3, 1), loss
+    
+    def zero_grad(self):
         self.optimizer.step()
-        return y_hat.permute(0, 2, 3, 1), loss.item()
+        self.optimizer.zero_grad()
+
 
     def val_operations(self, val_loss):
         """
         Update the LR Scheduler
         """
+        #self.lrscheduler2.step()
         self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
@@ -82,9 +88,9 @@ class Framework:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         model_path = Path(out_dir, f"model_{epoch}.pt")
-        optim_path = Path(out_dir, f"optim_{epoch}.pt")
+        #optim_path = Path(out_dir, f"optim_{epoch}.pt")
         torch.save(self.model.state_dict(), model_path)
-        torch.save(self.optimizer.state_dict(), optim_path)
+        #torch.save(self.optimizer.state_dict(), optim_path)
 
     def infer(self, x):
         """ Make a prediction for a given x
@@ -114,25 +120,25 @@ class Framework:
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
         loss = self.loss_fn(y_hat, y)
-        for reg_type in self.reg_opts.keys():
-            reg_fun = globals()[reg_type]
-            penalty = reg_fun(
-                self.model.parameters(),
-                self.reg_opts[reg_type],
-                self.device
-            )
-            loss += penalty
+        if self.reg_opts:
+            for reg_type in self.reg_opts.keys():
+                reg_fun = globals()[reg_type]
+                penalty = reg_fun(
+                    self.model.parameters(),
+                    self.reg_opts[reg_type],
+                    self.device
+                )
+                loss += penalty
 
         return loss
 
 
-    def metrics(self, y_hat, y, metrics_opts, masked):
+    def metrics(self, y_hat, y, masked):
         """ Loop over metrics in train.yaml
 
         Args:
             y_hat: Predictions
             y: Labels
-            metrics_opts: Metrics specified in the train.yaml
 
         Return:
             results
@@ -140,22 +146,28 @@ class Framework:
         """
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
+        n_classes = y.shape[3]
 
         if masked:
-            mask = torch.sum(y, dim=3) == 1
-            y_hat[mask] == torch.zeros(y.shape[3]).to(self.device)
+            mask = torch.sum(y, dim=3) == 0
 
-        results = {}
-        for k, metric in metrics_opts.items():
-            if "threshold" in metric.keys():
-                metric_value = torch.zeros(y_hat.shape[3])
-                y_hat = y_hat > metric["threshold"]
-                metric_fun = globals()[k]
-                for i in range(y_hat.shape[3]):
-                    metric_value[i] = metric_fun(y_hat[:,:,:,i], y[:,:,:,i])
-            results[k] = metric_value
+        y_hat = np.argmax(y_hat.cpu().numpy(), axis=3)+1
+        y = np.argmax(y.cpu().numpy(), axis=3)+1
+
+        if masked:
+            y_hat[mask] = 0
+            y[mask] = 0
+        
+        tp, fp, fn = torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+        for i in range(n_classes):
+            _y_hat = (y_hat == i+1).astype(np.uint8)
+            _y = (y == i+1).astype(np.uint8)
+            _tp, _fp, _fn = tp_fp_fn(_y_hat, _y)
+            tp[i] = _tp
+            fp[i] = _fp
+            fn[i] = _fn
             
-        return results
+        return tp, fp, fn
     
     def segment(self, y_hat):
         """Predict a class given logits
@@ -187,3 +199,28 @@ class Framework:
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)
+
+    def optim_load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict)
+
+    def load_best(self, model_path):
+        print(f"Validation loss higher than previous for 3 steps, loading previous state")
+        if torch.cuda.is_available():
+            state_dict = torch.load(model_path)
+        else:
+            state_dict = torch.load(model_path, map_location="cpu")
+        self.load_state_dict(state_dict)
+    
+    def save_best(self, out_dir):
+        print(f"Current validation loss lower than previous, saving current state")
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        model_path = Path(out_dir, f"model_best.h5")
+        optim_path = Path(out_dir, f"optim_best.h5")
+        torch.save(self.model.state_dict(), model_path)
+        torch.save(self.optimizer.state_dict(), optim_path)
+
+    def freeze_layers(self):
+        for i, layer in enumerate(self.model.parameters()):
+            if i < 60: # Freeze 60 out of 75 layers, retrain on last 15 only
+                layer.requires_grad = False

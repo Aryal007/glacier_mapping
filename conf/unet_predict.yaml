@@ -1,22 +1,16 @@
-data_dir: "/mnt/datadrive/noaa/"
-filename: '2017_NOAA_ANWR_4Band11.TIF'
-run_name: '7_channels'
-window_size: [512,512]
+data_dir: "/home/aryal007/DynamicEarthNet/Track2/data/"
+run_name: 'runs_A'
 model_opts:
   args: 
-    inchannels: 7
+    inchannels: 11
     outchannels: 2
-    net_depth: 5
+    net_depth: 7
     dropout: 0.3
     spatial: True
-    first_channel_output: 4
+    first_channel_output: 8
 optim_opts:
   name: "Adam"
   args:
     lr: 0.001
 reg_opts:
   l1_reg: 0.0005
-add_ndvi: True
-add_ndwi: True
-add_ndswi: True
-use_channels: [0,1,2,3,4,5,6]

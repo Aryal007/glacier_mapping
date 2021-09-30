@@ -143,10 +143,10 @@ def add_index(tiff_np, index1, index2, comment=None):
     tiff_np = np.concatenate((tiff_np, np.expand_dims(rsi, axis=2)), axis=2)
     return tiff_np
 
-def save_slices(filenum, tiff, mask, **conf):
+def save_slices(filename, tiff, mask, **conf):
     def verify_slice_size(slice, conf):
         if slice.shape[0] != conf["window_size"][0] or slice.shape[1] != conf["window_size"][1]:
-            temp = np.zeros((conf["window_size"][0], conf["window_size"][1], slice.shape[2]))
+            temp = np.zeros((conf["window_size"][0], conf["window_size"][1]))
             temp[0:slice.shape[0], 0:slice.shape[1]] = slice
             slice = temp
         return slice
@@ -163,28 +163,35 @@ def save_slices(filenum, tiff, mask, **conf):
 
     if not os.path.exists(conf["out_dir"]):
         os.makedirs(conf["out_dir"])
+
     tiff_np = np.transpose(tiff.read(), (1,2,0))
-    tiff_np = tiff_np / 255
+    tiff_np = (tiff_np - np.min(tiff_np, axis=(0,1)))/(np.max(tiff_np, axis=(0,1)) - np.min(tiff_np, axis=(0,1)))
 
     if conf["add_ndvi"]:
-        tiff_np = add_index(tiff_np, index1 = 3, index2 = 0, comment = "ndvi")
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 2, comment = "ndvi")
     if conf["add_ndwi"]:
         tiff_np = add_index(tiff_np, index1 = 1, index2 = 3, comment = "ndwi")
     if conf["add_ndswi"]:
-        tiff_np = add_index(tiff_np, index1 = 3, index2 = 2, comment = "ndswi")
-        
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 0, comment = "ndswi")
+    if conf["add_evi2"]:
+        evi2 = 2.5 * (tiff_np[:,:,3] - tiff_np[:,:,2]) / (tiff_np[:,:,3] + (2.4 * tiff_np[:,:,2]) + 1)
+        tiff_np = np.concatenate((tiff_np, np.expand_dims(evi2, axis=2)), axis=2)
+    if conf["add_osavi1"]:
+        osavi1 = (tiff_np[:,:,3] - tiff_np[:,:,2]) / (tiff_np[:,:,3] + tiff_np[:,:,2] + 0.16)
+        tiff_np = np.concatenate((tiff_np, np.expand_dims(osavi1, axis=2)), axis=2)
+
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):
         for column in range(0, tiff_np.shape[0], conf["window_size"][1]-conf["overlap"]):
-            mask_slice = mask[row:row+conf["window_size"][0], column:column+conf["window_size"][1], :]
+            mask_slice = mask[row:row+conf["window_size"][0], column:column+conf["window_size"][1]]
             mask_slice = verify_slice_size(mask_slice, conf)
 
             if filter_percentage(mask_slice, conf["filter"]):
                 tiff_slice = tiff_np[row:row+conf["window_size"][0], column:column+conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
-                save_slice(mask_slice, conf["out_dir"]+"mask_"+str(filenum)+"_slice_"+str(slicenum))
-                save_slice(tiff_slice, conf["out_dir"]+"tiff_"+str(filenum)+"_slice_"+str(slicenum))
-                print(f"Saved image {filenum} slice {slicenum}")
+                save_slice(mask_slice, conf["out_dir"]+"mask_"+str(filename)+"_slice_"+str(slicenum))
+                save_slice(tiff_slice, conf["out_dir"]+"tiff_"+str(filename)+"_slice_"+str(slicenum))
+                print(f"Saved image {filename} slice {slicenum}")
 
             slicenum += 1
 
@@ -196,7 +203,6 @@ def remove_and_create(dirpath):
     os.makedirs(dirpath)
 
 def train_test_shuffle(out_dir, train_split, val_split, test_split):
-    # Remove existing directory, create new ones
     train_path = out_dir + "train/"
     remove_and_create(train_path)
     val_path = out_dir + "val/"

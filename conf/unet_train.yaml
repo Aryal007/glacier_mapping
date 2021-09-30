@@ -1,38 +1,31 @@
-data_dir: "/mnt/datadrive/noaa/"
-batch_size: 32
-run_name: "7_channels"
-epochs: 76
-save_every: 15
-use_channels: [0,1,2,3,4,5,6]
+data_dir: "/data/baryal/coastal_mapping/data/"
+class_name: "Floodwater"
+batch_size: 1
+run_name: "G_dropout_batchnorm"
+epochs: 201
+save_every: 175
+use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 loss_opts:
   name: "dice"
   masked: True
-  weights: None
-  label_smoothing: 0.2
+  weights: [0.2, 0.8]
+  label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 7
+    inchannels: 13
     outchannels: 2
-    net_depth: 5
-    dropout: 0.3
+    net_depth: 7
+    dropout: 0.2
     spatial: True
-    first_channel_output: 4
+    first_channel_output: 16
 optim_opts:
   name: "Adam"
   args:
-    lr: 0.001
+    lr: 0.0001
 log_opts:
-  mask_names: ["Land", "Water"]
+  mask_names: ["XBackground", "Floodwater"]
+metrics_opts: ["IoU", "precision", "recall"]
+grad_accumulation_steps: None
+fine_tune: False
 reg_opts:
-  l1_reg: 0.0005
-metrics_opts:
-  IoU:
-    threshold: 0.4
-  pixel_acc:
-    threshold: 0.4
-  precision:
-    threshold: 0.4
-  recall:
-    threshold: 0.4
-  dice:
-    threshold: 0.4
+  l1_reg: 0.00001

@@ -12,9 +12,11 @@ from torchvision.utils import make_grid
 import torch
 import numpy as np
 from coastal_mapping.model.metrics import diceloss, balancedloss
+import pdb
+from PIL import Image
+from .metrics import *
 
-
-def train_epoch(loader, frame, metrics_opts, masked):
+def train_epoch(loader, frame, metrics_opts, masked, grad_accumulation_steps=None):
     """Train model for one epoch
 
     This makes one pass through a dataloader and updates the model in the
@@ -32,20 +34,28 @@ def train_epoch(loader, frame, metrics_opts, masked):
     :return (train_loss, metrics): A tuple containing the average epoch loss
       and the metrics on the training set.
     """
-    loss, metrics = 0, {}
+    n_classes = 2
+    loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
 
     for i, (x,y) in enumerate(loader):
         y_hat, _loss = frame.optimize(x, y)
-        loss += _loss
-        log_batch(i, loss, len(loader), loader.batch_size)
-
+        if grad_accumulation_steps != "None":
+            if (i+1) % grad_accumulation_steps == 0:
+                frame.zero_grad()
+        else:
+            frame.zero_grad()
+        loss += _loss.item()
         y_hat = frame.segment(y_hat)
-        metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
-        update_metrics(metrics, metrics_)
-
-    mean_metrics = agg_metrics(metrics)
+        _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
+        log_batch(i, loss, len(loader), loader.batch_size)
+        tp += _tp
+        fp += _fp 
+        fn += _fn 
+    frame.zero_grad()
+    
+    metrics = get_metrics(tp, fp, fn, metrics_opts)
         
-    return loss / len(loader.dataset), mean_metrics
+    return loss / len(loader.dataset), metrics
 
 
 def validate(loader, frame, metrics_opts, masked):
@@ -67,22 +77,22 @@ def validate(loader, frame, metrics_opts, masked):
     :return (val_loss, metrics): A tuple containing the average validation loss
       and the metrics on the validation set.
     """
-    loss, metrics = 0, {}
+    n_classes = 2
+    loss, tp, fp, fn = 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     channel_first = lambda x: x.permute(0, 3, 1, 2)
     frame.model.eval()
     for x, y in loader:
         with torch.no_grad():
             y_hat = frame.infer(x)
             loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
-
             y_hat = frame.segment(y_hat)
-            metrics_ = frame.metrics(y_hat, y, metrics_opts, masked)
-            update_metrics(metrics, metrics_)
-
+            _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
+            tp += _tp 
+            fp += _fp 
+            fn += _fn 
     frame.val_operations(loss/len(loader.dataset))
-    mean_metrics = agg_metrics(metrics)
-            
-    return loss / len(loader.dataset), mean_metrics
+    metrics = get_metrics(tp, fp, fn, metrics_opts)  
+    return loss / len(loader.dataset), metrics
 
 
 def log_batch(i, loss, n_batches, batch_size):
@@ -129,20 +139,37 @@ def log_images(writer, frame, batch, epoch, stage):
     Return:
         Images Logged onto tensorboard
     """
+    batch = next(iter(batch))
+    colors = {
+                0: np.array((255,0,0)),
+                1: np.array((0,0,0)),
+                2: np.array((0,255,0))
+            }
     pm = lambda x: x.permute(0, 3, 1, 2)
     squash = lambda x: (x - x.min()) / (x.max() - x.min())
-
     x, y = batch
-
+    y_mask = np.sum(y.cpu().numpy(), axis=3) == 0
     y_hat = frame.act(frame.infer(x))
-    y = torch.flatten(y.permute(0, 1, 3, 2), start_dim=2)
-    y_hat = torch.flatten(y_hat.permute(0, 1, 3, 2), start_dim=2)
+    y = np.argmax(y.cpu().numpy(), axis=3) + 1
+    y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
+    y[y_mask] = 0
+    y_hat[y_mask] = 0
 
-    if epoch == 0:
-        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, :3]))), epoch)
-        writer.add_image(f"{stage}/y", make_grid(y.unsqueeze(1)), epoch)
-        
-    writer.add_image(f"{stage}/y_hat", make_grid(y_hat.unsqueeze(1)), epoch)
+    _y = np.zeros((y.shape[0], y.shape[1], y.shape[2], 3))
+    _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2], 3))
+
+    for i in range(len(colors)):
+        _y[y == i] = colors[i]
+        _y_hat[y_hat == i] = colors[i]
+
+    y = _y
+    y_hat = _y_hat
+    
+    x[:,:,:,2] = x[:,:,:,2] / 2
+    x = torch.clamp(x, 0, 1)
+    writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
+    writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)    
+    writer.add_image(f"{stage}/y_hat", make_grid(pm(squash(torch.tensor(y_hat)))), epoch)
     
 def get_loss(outchannels, opts=None):
     if opts is None:
@@ -164,23 +191,14 @@ def get_loss(outchannels, opts=None):
 
     return loss_fn
 
-def update_metrics(main_metrics, batch_metrics):
-    """Append --inplace-- a dict of tensors to another element by element
-       Args:
-            main_metrics (dict(troch.Tensor)): the matrix to append to
-            batch_metrics (dict(troch.Tensor)): the new value to append to main_metrics
-    """
-    for k, v in batch_metrics.items():
-        if k in main_metrics:
-            main_metrics[k] = torch.cat((main_metrics[k], v.unsqueeze(-1)), 1)
-        else:
-            main_metrics[k] = v.unsqueeze(-1)
-
-def agg_metrics(metrics):
+def get_metrics(tp, fp, fn, metrics_opts):
     """Aggregate --inplace-- the mean of a matrix of tensor (across rows)
        Args:
             metrics (dict(troch.Tensor)): the matrix to get mean of"""
-    for k, v in metrics.items():
-        metrics[k] = metrics[k].mean(1)
+    metrics = dict.fromkeys(metrics_opts, np.zeros(2))
+
+    for metric, arr in metrics.items():
+        metric_fun = globals()[metric]
+        metrics[metric] = metric_fun(tp, fp, fn)
 
     return metrics
