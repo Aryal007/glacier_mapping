@@ -10,13 +10,13 @@ Frame to Combine Model with Optimizer
 This wraps the model and optimizer objects needed in training, so that each
 training step can be concisely called with a single method.
 """
-from pathlib import Path
-import torch
-import numpy as np
-from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
-import os, pdb
-from .metrics import *
 from .unet import *
+from .metrics import *
+
+import numpy as np
+import os, pdb, torch
+from pathlib import Path
+from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
 
 class Framework:
     """
@@ -46,7 +46,7 @@ class Framework:
                                              patience=15,
                                              factor = 0.75,
                                              min_lr = 1e-9)
-        self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
+        #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
 

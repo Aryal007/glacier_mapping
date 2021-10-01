@@ -7,16 +7,33 @@ Created on Fri Sep  4 23:18:43 2020
 
 Training/Validation Functions
 """
-
-from torchvision.utils import make_grid
-import torch
 import numpy as np
-from coastal_mapping.model.metrics import diceloss, balancedloss
-import pdb
-from PIL import Image
+from tqdm import tqdm
 from .metrics import *
+import logging, datetime, pdb, torch
+from torchvision.utils import make_grid
+from segmentation.model.metrics import diceloss
 
-def train_epoch(loader, frame, metrics_opts, masked, grad_accumulation_steps=None):
+LOGGER = logging.getLogger()
+LOGGER.setLevel(logging.INFO)
+HANDLER = logging.StreamHandler()
+HANDLER.setLevel(logging.INFO)
+FORMATTER = logging.Formatter("%(message)s")
+LOGGER.addHandler(HANDLER)
+
+def log(level, message):
+    """Log the message at a given level (from the standard logging package levels: ERROR, INFO, DEBUG etc).
+    Add a datetime prefix to the log message, and a SystemLog: prefix provided it is public data.
+    
+    Args:
+        level (int): logging level, best set by using logging.(INFO|DEBUG|WARNING) etc
+        message (str): mesage to log
+    """
+    message = "{}\t{}\t{}".format(datetime.datetime.now().strftime('%d-%m-%Y, %H:%M:%S'), logging._levelToName[level], message)
+    message = "SystemLog: " + message
+    logging.log(level, message)
+
+def train_epoch(epoch, loader, frame, conf):
     """Train model for one epoch
 
     This makes one pass through a dataloader and updates the model in the
@@ -34,10 +51,10 @@ def train_epoch(loader, frame, metrics_opts, masked, grad_accumulation_steps=Non
     :return (train_loss, metrics): A tuple containing the average epoch loss
       and the metrics on the training set.
     """
-    n_classes = 2
+    metrics_opts, masked, n_classes, grad_accumulation_steps = conf.metrics_opts, conf.loss_masked, len(conf.log_opts.mask_names), conf.grad_accumulation_steps
     loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
-
-    for i, (x,y) in enumerate(loader):
+    train_iterator = tqdm(loader, desc="Train Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
+    for i, (x,y) in enumerate(train_iterator):
         y_hat, _loss = frame.optimize(x, y)
         if grad_accumulation_steps != "None":
             if (i+1) % grad_accumulation_steps == 0:
@@ -47,18 +64,16 @@ def train_epoch(loader, frame, metrics_opts, masked, grad_accumulation_steps=Non
         loss += _loss.item()
         y_hat = frame.segment(y_hat)
         _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
-        log_batch(i, loss, len(loader), loader.batch_size)
         tp += _tp
         fp += _fp 
         fn += _fn 
+        train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, _loss.item(), loss/(i+1)))
     frame.zero_grad()
-    
     metrics = get_metrics(tp, fp, fn, metrics_opts)
-        
     return loss / len(loader.dataset), metrics
 
 
-def validate(loader, frame, metrics_opts, masked):
+def validate(epoch, loader, frame, conf):
     """Compute Metrics on a Validation Loader
 
     To honestly evaluate a model, we should compute its metrics on a validation
@@ -77,11 +92,12 @@ def validate(loader, frame, metrics_opts, masked):
     :return (val_loss, metrics): A tuple containing the average validation loss
       and the metrics on the validation set.
     """
-    n_classes = 2
+    metrics_opts, masked, n_classes = conf.metrics_opts, conf.loss_masked, len(conf.log_opts.mask_names)
     loss, tp, fp, fn = 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+    val_iterator = tqdm(loader, desc="Val Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     channel_first = lambda x: x.permute(0, 3, 1, 2)
-    frame.model.eval()
-    for x, y in loader:
+    #frame.model.eval()
+    for i, (x,y) in enumerate(val_iterator):
         with torch.no_grad():
             y_hat = frame.infer(x)
             loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
@@ -90,26 +106,10 @@ def validate(loader, frame, metrics_opts, masked):
             tp += _tp 
             fp += _fp 
             fn += _fn 
+            val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, loss, loss/(i+1)))
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
     return loss / len(loader.dataset), metrics
-
-
-def log_batch(i, loss, n_batches, batch_size):
-    """Helper to log a training batch
-
-    :param i: Current batch index
-    :type i: int
-    :param loss: current epoch loss
-    :type loss: float
-    :param batch_size: training batch size
-    :type batch_size: int
-    """
-    print(
-        f"Training batch {i+1} of {n_batches}, Loss = {loss/batch_size/(i+1):.5f}",
-        end="\r",
-        flush=True,
-    )
 
 def log_metrics(writer, metrics, epoch, stage, mask_names=None):
     """Log metrics for tensorboard
@@ -154,17 +154,14 @@ def log_images(writer, frame, batch, epoch, stage):
     y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
     y[y_mask] = 0
     y_hat[y_mask] = 0
-
     _y = np.zeros((y.shape[0], y.shape[1], y.shape[2], 3))
     _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2], 3))
 
     for i in range(len(colors)):
         _y[y == i] = colors[i]
         _y_hat[y_hat == i] = colors[i]
-
     y = _y
     y_hat = _y_hat
-    
     x[:,:,:,2] = x[:,:,:,2] / 2
     x = torch.clamp(x, 0, 1)
     writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
@@ -174,7 +171,6 @@ def log_images(writer, frame, batch, epoch, stage):
 def get_loss(outchannels, opts=None):
     if opts is None:
         return diceloss()
-        
     if opts["weights"] == "None":
         loss_weight = np.ones(outchannels) / outchannels
     else:
@@ -188,17 +184,33 @@ def get_loss(outchannels, opts=None):
                             outchannels=outchannels, masked = opts["masked"])
     else:
         raise ValueError("Loss name must be dice or balanced!")
-
     return loss_fn
 
 def get_metrics(tp, fp, fn, metrics_opts):
-    """Aggregate --inplace-- the mean of a matrix of tensor (across rows)
-       Args:
-            metrics (dict(troch.Tensor)): the matrix to get mean of"""
+    """
+    Aggregate --inplace-- the mean of a matrix of tensor (across rows)
+    Args:
+        metrics (dict(troch.Tensor)): the matrix to get mean of
+    """
     metrics = dict.fromkeys(metrics_opts, np.zeros(2))
-
     for metric, arr in metrics.items():
         metric_fun = globals()[metric]
         metrics[metric] = metric_fun(tp, fp, fn)
-
     return metrics
+
+def print_conf(conf):
+    for key, value in conf.items():
+        log(logging.INFO, "{} = {}".format(key, value))
+
+
+def print_metrics(conf, train_metric, val_metric, round=2):
+    train_classes, val_classes = dict(), dict()
+    for i, c in enumerate(conf.log_opts.mask_names):
+        train_metric_log, val_metric_log = dict(), dict()
+        for metric in conf.metrics_opts:
+            train_metric_log[metric] = np.round(train_metric[metric][i].item(), 2)
+            val_metric_log[metric] = np.round(val_metric[metric][i].item(), 2)
+        train_classes[c] = train_metric_log
+        val_classes[c] = val_metric_log
+    log(logging.INFO, "Train | {}".format(train_classes))
+    log(logging.INFO, "Val | {}\n".format(val_classes))

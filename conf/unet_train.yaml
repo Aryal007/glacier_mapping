@@ -1,4 +1,4 @@
-data_dir: "/data/baryal/coastal_mapping/data/"
+data_dir: "/datadrive/coastal_mapping/data/"
 class_name: "Floodwater"
 batch_size: 1
 run_name: "G_dropout_batchnorm"

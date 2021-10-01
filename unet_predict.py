@@ -3,25 +3,21 @@
 """
 Created on Sat Feb 26 2:57:34 2021
 
-@author: mibook
+@author: Aryal007
 """
-from coastal_mapping.data.data import fetch_loaders
-from coastal_mapping.model.frame import Framework
-from coastal_mapping.data.slice import add_index
-import coastal_mapping.model.functions as fn
+from segmentation.data.data import fetch_loaders
+from segmentation.model.frame import Framework
+from segmentation.data.slice import add_index
+import segmentation.model.functions as fn
 
-import yaml, pathlib, pickle
-from addict import Dict
-import rasterio
-import numpy as np
-import warnings
-import pdb
-import torch
-import matplotlib.pyplot as plt
+import yaml, pathlib, pickle, rasterio, warnings, torch, matplotlib
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import matplotlib
-from matplotlib import cm 
 from matplotlib.colors import ListedColormap
+import matplotlib.pyplot as plt
+from matplotlib import cm 
+from addict import Dict
+import numpy as np
+import pdb
 
 top = cm.get_cmap('Oranges_r', 128)
 bottom = cm.get_cmap('Blues', 128)

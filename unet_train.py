@@ -3,18 +3,17 @@
 """
 Created on Wed Feb 17 12:59:22 2021
 
-@author: mibook
+@author: Aryal007
 """
-from coastal_mapping.data.data import fetch_loaders
-from coastal_mapping.model.frame import Framework
-import coastal_mapping.model.functions as fn
+from segmentation.data.data import fetch_loaders
+from segmentation.model.frame import Framework
+import segmentation.model.functions as fn
 
+import yaml, json, pathlib, warnings, pdb, torch, logging, time
 from torch.utils.tensorboard import SummaryWriter
-import yaml, json, pathlib
 from addict import Dict
-import warnings, pdb
-import torch, time
 import numpy as np
+
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     )
 
     if conf.fine_tune:
-        print(f"Finetuning the model")
+        fn.log(logging.INFO, f"Finetuning the model")
         run_name = conf.run_name+"_finetuned"
         model_path = f"{data_dir}/runs/{conf.run_name}/models/model_final.pt"
         if torch.cuda.is_available():
@@ -48,18 +47,22 @@ if __name__ == "__main__":
     writer.add_text("Configuration Parameters", json.dumps(conf))
     out_dir = f"{data_dir}/runs/{run_name}/models/"
     val_loss = np.inf
+    
+    #fn.log(logging.INFO, "Configuration =  {}".format(conf))
+    fn.print_conf(conf)
+    fn.log(logging.INFO, "# Training Instances = {}, # Validation Instances = {}".format(len(loaders["train"]), len(loaders["val"])))
 
     for epoch in range(conf.epochs):
         # train loop
         loss = {}
         start = time.time()
-        loss["train"], train_metric = fn.train_epoch(loaders["train"], frame, conf.metrics_opts, conf.loss_masked, conf.grad_accumulation_steps)
+        loss["train"], train_metric = fn.train_epoch(epoch, loaders["train"], frame, conf)
         fn.log_metrics(writer, train_metric, epoch+1, "train", conf.log_opts.mask_names)
         train_time = time.time() - start
 
         # validation loop
         start = time.time()
-        loss["val"], val_metric = fn.validate(loaders["val"], frame, conf.metrics_opts, conf.loss_masked)
+        loss["val"], val_metric = fn.validate(epoch, loaders["val"], frame, conf)
         fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
         val_time = time.time() - start
 
@@ -74,10 +77,7 @@ if __name__ == "__main__":
         if conf.epochs - epoch <= 3:
             frame.save(out_dir, epoch)
 
-        print(f"{epoch+1}/{conf.epochs} | train_loss: {loss['train']:.5f} | val_loss: {loss['val']:.5f} \
-                | iou: {val_metric['IoU'][0]:.3f}, {val_metric['IoU'][1]:.3f} | precision: {val_metric['precision'][0]:.3f}, {val_metric['precision'][1]:.3f} | recall: {val_metric['recall'][0]:.3f}, {val_metric['recall'][1]:.3f} \
-                | train_batch_time: {train_time:.2f} | val_batch_time: {val_time:.2f}")
-
+        fn.print_metrics(conf, train_metric, val_metric)
         writer.flush()
 
     frame.save(out_dir, "final")

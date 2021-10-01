@@ -32,17 +32,20 @@ def recall(tp, fp, fn):
     except:
         return 0
 
+
 def dice(tp, fp, fn):
     try:
         return (2 * tp) / (2 * tp + fp + fn)
     except:
         return 0
 
+
 def IoU(tp, fp, fn):
     try:
         return tp / (tp + fp + fn)
     except:
         return 0
+        
     
 class diceloss(torch.nn.Module):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
