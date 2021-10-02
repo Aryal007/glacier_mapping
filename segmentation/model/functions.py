@@ -12,7 +12,7 @@ from tqdm import tqdm
 from .metrics import *
 import logging, datetime, pdb, torch
 from torchvision.utils import make_grid
-from segmentation.model.metrics import diceloss
+from segmentation.model.losses import *
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
@@ -100,13 +100,14 @@ def validate(epoch, loader, frame, conf):
     for i, (x,y) in enumerate(val_iterator):
         with torch.no_grad():
             y_hat = frame.infer(x)
-            loss += frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
+            _loss = frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
+            loss += _loss
             y_hat = frame.segment(y_hat)
             _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
             tp += _tp 
             fp += _fp 
             fn += _fn 
-            val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, loss, loss/(i+1)))
+            val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, _loss, loss/(i+1)))
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
     return loss / len(loader.dataset), metrics
@@ -171,19 +172,34 @@ def log_images(writer, frame, batch, epoch, stage):
 def get_loss(outchannels, opts=None):
     if opts is None:
         return diceloss()
-    if opts["weights"] == "None":
+    if opts.weights == "None":
         loss_weight = np.ones(outchannels) / outchannels
     else:
-        loss_weight = opts["weights"]
-    label_smoothing = opts["label_smoothing"]
-    if opts["name"] == "dice":
-        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
-                            outchannels=outchannels, label_smoothing=label_smoothing, masked=opts["masked"])
-    elif opts["name"] == "balanced":
-        loss_fn = balancedloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts["masked"])
+        loss_weight = opts.weights
+    if opts.label_smoothing == "None":
+        label_smoothing = 0
     else:
-        raise ValueError("Loss name must be dice or balanced!")
+        label_smoothing = opts.label_smoothing
+    if opts.name == "dice":
+        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
+                            outchannels=outchannels, label_smoothing=label_smoothing, masked=opts.masked)
+    elif opts.name == "iou":
+        loss_fn = iouloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts.masked)
+    elif opts.name == "ce":
+        loss_fn = celoss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts.masked)
+    elif opts.name == "nll":
+        loss_fn = nllloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts.masked)
+    elif opts.name == "focal":
+        loss_fn = focalloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts.masked)
+    elif opts.name == "custom":
+        loss_fn = customloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
+                            outchannels=outchannels, masked = opts.masked)                  
+    else:
+        raise ValueError("Loss must be defined!")
     return loss_fn
 
 def get_metrics(tp, fp, fn, metrics_opts):
