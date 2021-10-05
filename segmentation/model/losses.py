@@ -65,7 +65,7 @@ class iouloss(torch.nn.Module):
         A_sum = pred[mask].sum(dim=0)
         B_sum = target[mask].sum(dim=0)
         union = A_sum + B_sum - intersection
-        iou =  -(intersection + self.smooth) / (union + self.smooth)
+        iou =  1 - ((intersection + self.smooth) / (union + self.smooth))
         iou = iou * self.w.to(device=iou.device)
         return iou.sum()
 
