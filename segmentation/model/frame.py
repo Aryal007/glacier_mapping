@@ -43,12 +43,14 @@ class Framework:
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose = True, 
-                                             patience=15,
+                                             patience=2,
                                              factor = 0.75,
                                              min_lr = 1e-9)
         #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
+    def get_model(self):
+        return self.model
 
     def optimize(self, x, y):
         """

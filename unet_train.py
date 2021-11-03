@@ -21,8 +21,9 @@ if __name__ == "__main__":
     data_dir = pathlib.Path(conf.data_dir)
     class_name = conf.class_name
     run_name = conf.run_name
-    processed_dir = data_dir / "processed"
-    loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels)
+    #processed_dir = data_dir / "processed"
+    processed_dir = data_dir
+    loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels, val_folder = 'valid')
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)            
     frame = Framework(
         loss_fn = loss_fn,
@@ -45,10 +46,10 @@ if __name__ == "__main__":
     # Setup logging
     writer = SummaryWriter(f"{data_dir}/runs/{run_name}/logs/")
     writer.add_text("Configuration Parameters", json.dumps(conf))
+    #writer.add_graph(frame.get_model(), next(iter(loaders['train'])))
     out_dir = f"{data_dir}/runs/{run_name}/models/"
     val_loss = np.inf
     
-    #fn.log(logging.INFO, "Configuration =  {}".format(conf))
     fn.print_conf(conf)
     fn.log(logging.INFO, "# Training Instances = {}, # Validation Instances = {}".format(len(loaders["train"]), len(loaders["val"])))
 
@@ -72,10 +73,10 @@ if __name__ == "__main__":
 
         writer.add_scalars("Loss", loss, epoch)
         # Save model
-        if epoch % conf.save_every == 0:
-            frame.save(out_dir, epoch)
-        if conf.epochs - epoch <= 3:
-            frame.save(out_dir, epoch)
+        # if epoch % conf.save_every == 0:
+        #     frame.save(out_dir, epoch)
+        # if conf.epochs - epoch <= 3:
+        #     frame.save(out_dir, epoch)
 
         fn.print_metrics(conf, train_metric, val_metric)
         writer.flush()

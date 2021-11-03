@@ -174,14 +174,16 @@ class customloss(torch.nn.modules.loss._WeightedLoss):
             mask = torch.ones((target.size()[0], target.size()[2], target.size()[3]), dtype=torch.bool)
         focal_loss = sigmoid_focal_loss(pred, target, alpha = -1, gamma = 2, reduction = "mean")
         target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
+        _pred = self.act(pred)
+        ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=_pred.device))(_pred, torch.argmax(target, dim=1).long())
 
         pred = self.act(pred).permute(0,2,3,1)
         target = target.permute(0,2,3,1)
         intersection = (pred * target)[mask].sum(dim=0)
         A_sum = pred[mask].sum(dim=0)
         B_sum = target[mask].sum(dim=0)
-        union = A_sum + B_sum - intersection
-        iou =  -(intersection + self.smooth) / (union + self.smooth)
-        iou = iou * self.w.to(device=iou.device)
+        total_sum = A_sum + B_sum
+        dice = 1 - ((2.0 * intersection + self.smooth) / (total_sum + self.smooth))
+        dice = dice * self.w.to(device=dice.device)
 
-        return iou.sum() + focal_loss
+        return dice.sum() + 2 * ce

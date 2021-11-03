@@ -25,20 +25,21 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     """
     normalize = False
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
-                                    transforms = transforms.Compose([
-                                               DropoutChannels(1),
-                                               FlipHorizontal(0.3),
-                                               FlipVertical(0.3),
-                                               Rot270(0.3),
-                                               Cut(0.3)
-                                           ]))
+                                    #transforms = transforms.Compose([
+                                    #           DropoutChannels(1),
+                                    #           FlipHorizontal(0.3),
+                                    #           FlipVertical(0.3),
+                                    #           Rot270(0.3),
+                                    #           Cut(0.5)
+                                    #       ])
+                                    )
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
     
     loader = {
         "train": DataLoader(train_dataset, batch_size=batch_size,
                             num_workers=8, shuffle=shuffle),
         "val": DataLoader(val_dataset, batch_size=batch_size,
-                          num_workers=3, shuffle=shuffle)}
+                          num_workers=3, shuffle=False)}
 
     if test_folder:
         test_dataset = CoastalDataset(processed_dir / test_folder, use_channels)
@@ -59,7 +60,7 @@ class CoastalDataset(Dataset):
             folder_path(str): A path to data directory
         """
 
-        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))
+        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))[:1000]
         self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
         self.use_channels = use_channels
         self.normalize = normalize
@@ -83,6 +84,7 @@ class CoastalDataset(Dataset):
         if self.normalize:
             data = (data - self.mean) / self.std
         label = np.load(mask_path)
+        label = (label > 0.5).astype(np.uint8)
         zeros = label == 0
         ones = label == 1
         label = np.concatenate((zeros, ones), axis=2)
@@ -212,6 +214,6 @@ class DropoutChannels(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            rand_channel_index = np.random.randint(low = 2, high = data.shape[2], size=(1,10))[0]
+            rand_channel_index = np.random.randint(low = 0, high = data.shape[2])
             data[:, :, rand_channel_index] = 0
         return {'image': data, 'mask': label}
