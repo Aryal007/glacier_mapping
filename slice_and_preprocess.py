@@ -6,39 +6,70 @@ Created on Wed Feb 24 13:27:56 2021
 @author: mibook
 """ 
 import os, yaml
+from pathlib import Path
 import numpy as np
 from addict import Dict
-import coastal_mapping.data.slice as fn
-import warnings
+import segmentation.data.slice as fn
+import warnings, pdb
+import pandas as pd
 warnings.filterwarnings("ignore")
 
 conf = Dict(yaml.safe_load(open('./conf/slice_and_preprocess.yaml')))
 
-label_filenames = [x for x in os.listdir(conf.labels_dir) if x.endswith('.shp')]
-tiff_filenames = [x.replace('shp','TIF') for x in label_filenames]
+df = pd.read_csv(Path(conf.image_dir) / 'metadata.csv')
+train_df = df[df.split == "train"]
+val_ids = [
+            '133041','133040','134040','135040',
+            '138041','147037','149034','150036',
+            '152034','146038','147036','144039'
+        ]
+val_filenames = sorted([x+'.tif' for x in train_df.image_id if x.split("_")[1] in val_ids])
+train_filenames = sorted([x+'.tif' for x in train_df.image_id if x.split("_")[1] not in val_ids])
+val_filenames = [Path(conf.image_dir) / x for x in val_filenames]
+train_filenames = [Path(conf.image_dir) / x for x in train_filenames]
+label_filename = Path(conf.labels_dir) / "train.shp"
+shp = fn.read_shp(label_filename)
 
 fn.remove_and_create(conf.out_dir)
 
-means, stds = [], []
-for i, (label_filename, tiff_filename) in enumerate(zip(label_filenames, tiff_filenames)):
-    shp = fn.read_shp(conf.labels_dir+label_filename)
-    tiff = fn.read_tiff(conf.image_dir+tiff_filename)
-    
+means, stds, mins, maxs = [], [], [], []
+savepath = Path(conf["out_dir"]) / 'train'
+fn.remove_and_create(savepath)
+for i, train_filename in enumerate(train_filenames):
+    print(f"Filename: {train_filename.name}")
+    tiff = fn.read_tiff(train_filename)
     mask = fn.get_mask(tiff, shp)
-    
-    mean, std = fn.save_slices(i, tiff, mask, **conf)
+    mean, std, min, max = fn.save_slices(i, tiff, mask, savepath, **conf)
     means.append(mean) 
     stds.append(std)
+    mins.append(min) 
+    maxs.append(max)
 
-print("Saving slices completed!!!")
+print("Saving training slices completed!!!")
 means = np.mean(np.asarray(means), axis=0)
 stds = np.mean(np.asarray(stds), axis=0)
+mins = np.min(np.asarray(mins), axis=0)
+maxs = np.mean(np.asarray(maxs), axis=0)
 
-np.save(conf.out_dir+"normalize", np.asarray((means, stds)))
+np.save(conf.out_dir+"normalize_train", np.asarray((means, stds, mins, maxs)))
 
-if conf.train_split+conf.val_split+conf.test_split != 1:
-    raise ValueError("Sum of train, test, val split should be 1!")
+means, stds, mins, maxs = [], [], [], []
+savepath = Path(conf["out_dir"]) / 'val'
+fn.remove_and_create(savepath)
+for i, val_filename in enumerate(val_filenames[10:]):
+    print(f"Filename: {val_filename.name}")
+    tiff = fn.read_tiff(val_filename)
+    mask = fn.get_mask(tiff, shp)
+    mean, std, min, max = fn.save_slices(i, tiff, mask, savepath, **conf)
+    means.append(mean) 
+    stds.append(std)
+    mins.append(min) 
+    maxs.append(max)
 
-fn.train_test_shuffle(conf.out_dir, conf.train_split, conf.val_split, conf.test_split)
+print("Saving validation slices completed!!!")
+means = np.mean(np.asarray(means), axis=0)
+stds = np.mean(np.asarray(stds), axis=0)
+mins = np.min(np.asarray(mins), axis=0)
+maxs = np.mean(np.asarray(maxs), axis=0)
 
-print("Shuffle complete...")
+np.save(conf.out_dir+"normalize_val", np.asarray((means, stds, mins, maxs)))

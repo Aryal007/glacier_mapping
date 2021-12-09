@@ -55,20 +55,26 @@ def train_epoch(epoch, loader, frame, conf):
     loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     train_iterator = tqdm(loader, desc="Train Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     for i, (x,y) in enumerate(train_iterator):
-        y_hat, _loss = frame.optimize(x, y)
         if grad_accumulation_steps != "None":
             if (i+1) % grad_accumulation_steps == 0:
                 frame.zero_grad()
         else:
             frame.zero_grad()
-        loss += _loss.item()
+        y_hat, batch_loss = frame.optimize(x, y)
+        if grad_accumulation_steps != "None":
+            if (i+1) % grad_accumulation_steps == 0:
+                frame.step()
+        else:
+            frame.step()
+        loss += float(batch_loss)
         y_hat = frame.segment(y_hat)
         _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
         tp += _tp
         fp += _fp 
         fn += _fn 
-        train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, _loss.item(), loss/(i+1)))
-    frame.zero_grad()
+        train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
+    del(y_hat)
+    del(train_iterator)
     metrics = get_metrics(tp, fp, fn, metrics_opts)
     return loss / len(loader.dataset), metrics
 
@@ -93,20 +99,23 @@ def validate(epoch, loader, frame, conf):
       and the metrics on the validation set.
     """
     metrics_opts, masked, n_classes = conf.metrics_opts, conf.loss_masked, len(conf.log_opts.mask_names)
-    loss, tp, fp, fn = 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+    loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     val_iterator = tqdm(loader, desc="Val Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     channel_first = lambda x: x.permute(0, 3, 1, 2)
     for i, (x,y) in enumerate(val_iterator):
-        with torch.no_grad():
-            y_hat = frame.infer(x)
-            _loss = frame.calc_loss(channel_first(y_hat), channel_first(y)).item()
-            loss += _loss
-            y_hat = frame.segment(y_hat)
-            _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
-            tp += _tp 
-            fp += _fp 
-            fn += _fn 
-            val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, _loss, loss/(i+1)))
+        y_hat = frame.infer(x)
+        batch_loss = frame.calc_loss(channel_first(y_hat), channel_first(y))
+        batch_loss = float(batch_loss.detach().item())
+        loss += batch_loss
+        y_hat = frame.segment(y_hat)
+        _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
+        tp += _tp 
+        fp += _fp 
+        fn += _fn 
+        val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
+        del(y_hat)
+    del(channel_first)
+    del(val_iterator)
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
     return loss / len(loader.dataset), metrics
@@ -124,7 +133,7 @@ def log_metrics(writer, metrics, epoch, stage, mask_names=None):
     """
     for k, v in metrics.items():
         for name, metric in zip(mask_names, v):
-            writer.add_scalar(f"{name}_{str(k)}/{stage}", metric, epoch)
+            writer.add_scalar(f"{stage}_{str(k)}/{name}", metric, epoch)
 
 def log_images(writer, frame, batch, epoch, stage):
     """Log images for tensorboard
@@ -142,8 +151,9 @@ def log_images(writer, frame, batch, epoch, stage):
     batch = next(iter(batch))
     colors = {
                 0: np.array((255,0,0)),
-                1: np.array((128,128,128)),
-                2: np.array((0,255,0))
+                1: np.array((222, 184, 135)),
+                2: np.array((95, 158, 160)),
+                3: np.array((165, 42, 42)),
             }
     pm = lambda x: x.permute(0, 3, 1, 2)
     squash = lambda x: (x - x.min()) / (x.max() - x.min())
@@ -151,20 +161,20 @@ def log_images(writer, frame, batch, epoch, stage):
     y_mask = np.sum(y.cpu().numpy(), axis=3) == 0
     y_hat = frame.act(frame.infer(x))
     y = np.argmax(y.cpu().numpy(), axis=3) + 1
-    #y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
-    y_hat = y_hat.cpu().numpy()[:,:,:,1][:,:,:,None]
+    y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
+    #y_hat = y_hat.cpu().numpy()[:,:,:,1][:,:,:,None]
     y[y_mask] = 0
-    #y_hat[y_mask] = 0
+    y_hat[y_mask] = 0
     _y = np.zeros((y.shape[0], y.shape[1], y.shape[2], 3))
-    #_y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2], 3))
+    _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2], 3))
 
     for i in range(len(colors)):
         _y[y == i] = colors[i]
-        #_y_hat[y_hat == i] = colors[i]
+        _y_hat[y_hat == i] = colors[i]
     y = _y
-    #y_hat = _y_hat
+    y_hat = _y_hat
     x = torch.clamp(x, 0, 1)
-    writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
+    writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[4,3,1]]))), epoch)
     writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)    
     writer.add_image(f"{stage}/y_hat", make_grid(pm(squash(torch.tensor(y_hat)))), epoch)
     

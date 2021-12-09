@@ -49,8 +49,8 @@ class Framework:
         #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
-    def get_model(self):
-        return self.model
+    def add_graph(self, writer, input):
+        writer.add_graph(self.model, input_to_model = input[0].permute((0,3,1,2)).to(self.device))
 
     def optimize(self, x, y):
         """
@@ -69,12 +69,13 @@ class Framework:
         
         loss = self.calc_loss(y_hat, y)
         loss.backward()
-        return y_hat.permute(0, 2, 3, 1), loss
+        return y_hat.permute(0, 2, 3, 1), float(loss.detach().item())
     
     def zero_grad(self):
-        self.optimizer.step()
         self.optimizer.zero_grad()
 
+    def step(self):
+        self.optimizer.step()
 
     def val_operations(self, val_loss):
         """
@@ -90,9 +91,8 @@ class Framework:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         model_path = Path(out_dir, f"model_{epoch}.pt")
-        #optim_path = Path(out_dir, f"optim_{epoch}.pt")
         torch.save(self.model.state_dict(), model_path)
-        #torch.save(self.optimizer.state_dict(), optim_path)
+        print(f"Saved model {epoch}")
 
     def infer(self, x):
         """ Make a prediction for a given x
@@ -104,9 +104,9 @@ class Framework:
             Prediction
 
         """
-        x = x.permute(0, 3, 1, 2).to(self.device)
         with torch.no_grad():
-            return self.model(x).permute(0, 2, 3, 1)
+            y = self.model(x.permute(0, 3, 1, 2).to(self.device))
+        return y.permute(0, 2, 3, 1)
 
     def calc_loss(self, y_hat, y):
         """ Compute loss given a prediction
@@ -131,7 +131,6 @@ class Framework:
                     self.device
                 )
                 loss += penalty
-
         return loss
 
 
@@ -168,7 +167,7 @@ class Framework:
             tp[i] = _tp
             fp[i] = _fp
             fn[i] = _fn
-            
+
         return tp, fp, fn
     
     def segment(self, y_hat):
@@ -218,9 +217,7 @@ class Framework:
         if not os.path.exists(out_dir):
             os.makedirs(out_dir)
         model_path = Path(out_dir, f"model_best.h5")
-        optim_path = Path(out_dir, f"optim_best.h5")
         torch.save(self.model.state_dict(), model_path)
-        torch.save(self.optimizer.state_dict(), optim_path)
 
     def freeze_layers(self):
         for i, layer in enumerate(self.model.parameters()):

@@ -6,7 +6,7 @@ Created on Wed Feb 17 13:24:56 2021
 @author: mibook
 """
 import glob
-import os, pdb
+import os, pdb, gc
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch
@@ -25,28 +25,24 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     """
     normalize = False
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
-                                    #transforms = transforms.Compose([
-                                    #           DropoutChannels(1),
-                                    #           FlipHorizontal(0.3),
-                                    #           FlipVertical(0.3),
-                                    #           Rot270(0.3),
-                                    #           Cut(0.5)
-                                    #       ])
+                                    transforms = transforms.Compose([
+                                               DropoutChannels(0.2),
+                                               FlipHorizontal(0.2),
+                                               FlipVertical(0.2),
+                                               Rot270(0.2),
+                                               Cut(0.2)
+                                           ])
                                     )
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
-    
-    loader = {
-        "train": DataLoader(train_dataset, batch_size=batch_size,
-                            num_workers=8, shuffle=shuffle),
-        "val": DataLoader(val_dataset, batch_size=batch_size,
-                          num_workers=3, shuffle=False)}
 
-    if test_folder:
-        test_dataset = CoastalDataset(processed_dir / test_folder, use_channels)
-        loader["test"] = DataLoader(test_dataset, batch_size=batch_size,
-                                    num_workers=3, shuffle=shuffle)
-
-    return loader
+    train_loader = DataLoader(train_dataset, batch_size=batch_size,
+                        num_workers=0, shuffle=shuffle)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size,
+                        num_workers=0, shuffle=shuffle)
+    del(train_dataset)
+    del(val_dataset)
+    gc.collect()
+    return train_loader, val_loader
 
 class CoastalDataset(Dataset):
     """Custom Dataset for Coastal Data
@@ -60,7 +56,7 @@ class CoastalDataset(Dataset):
             folder_path(str): A path to data directory
         """
 
-        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))[:1000]
+        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))
         self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
         self.use_channels = use_channels
         self.normalize = normalize
@@ -68,6 +64,9 @@ class CoastalDataset(Dataset):
         if self.normalize:
             arr = np.load(folder_path.parent / "normalize.npy")
             self.mean, self.std = arr[0][use_channels], arr[1][use_channels]
+        self.min = np.asarray([0,0,0,0,0,0,0,0,0,0,0,-1,-1])
+        self.max = np.asarray([255,255,255,255,255,255, 255, 255,
+                                255, 90, 1, 1, 1])
 
     def __getitem__(self, index):
 
@@ -77,22 +76,30 @@ class CoastalDataset(Dataset):
         Return:
             data(x) and corresponding label(y)
         """
-        img_path = self.img_files[index]
-        mask_path = self.mask_files[index]
-        data = np.load(img_path)
+        data = np.load(self.img_files[index])
         data = data[:,:,self.use_channels]  
-        if self.normalize:
-            data = (data - self.mean) / self.std
-        label = np.load(mask_path)
-        label = (label > 0.5).astype(np.uint8)
-        zeros = label == 0
+        data = (data - self.min) / (self.max - self.min)
+        label = np.expand_dims(np.load(self.mask_files[index]), axis=2)
         ones = label == 1
-        label = np.concatenate((zeros, ones), axis=2)
-        sample = {'image': data, 'mask': label}
+        twos = label == 2
+        zeros = np.invert(ones+twos)
+        label = np.concatenate((zeros, ones, twos), axis=2)
+        del(ones)
+        del(twos)
+        del(zeros)
+        label[np.sum(data[:, :, :7], axis=2) == 0] = 0
         if self.transforms:
+            sample = {'image': data, 'mask': label}
+            del(data)
+            del(label)
             sample = self.transforms(sample)
-        data = torch.from_numpy(sample['image'].copy()).float()
-        label = torch.from_numpy(sample['mask'].copy()).float()
+            data = torch.from_numpy(sample['image'].copy()).float()
+            label = torch.from_numpy(sample['mask'].copy()).float()
+            del(sample)
+        else:
+            data = torch.from_numpy(data).float()
+            label = torch.from_numpy(label).float()
+        gc.collect()
         return data, label
 
     def __len__(self):
@@ -103,7 +110,6 @@ class CoastalDataset(Dataset):
                 len(img_files)(int): The length of the dataset (img_files)
         """
         return len(self.img_files)
-
 
 class FlipHorizontal(object):
     """Flip horizontal randomly the image in a sample.

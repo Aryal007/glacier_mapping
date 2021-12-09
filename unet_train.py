@@ -9,7 +9,7 @@ from segmentation.data.data import fetch_loaders
 from segmentation.model.frame import Framework
 import segmentation.model.functions as fn
 
-import yaml, json, pathlib, warnings, pdb, torch, logging, time
+import yaml, json, pathlib, warnings, pdb, torch, logging, time, gc
 from torch.utils.tensorboard import SummaryWriter
 from addict import Dict
 import numpy as np
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     run_name = conf.run_name
     #processed_dir = data_dir / "processed"
     processed_dir = data_dir
-    loaders = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels, val_folder = 'valid')
+    train_loader, val_loader = fetch_loaders(processed_dir, conf.batch_size, conf.use_channels, val_folder = 'val')
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)            
     frame = Framework(
         loss_fn = loss_fn,
@@ -46,40 +46,41 @@ if __name__ == "__main__":
     # Setup logging
     writer = SummaryWriter(f"{data_dir}/runs/{run_name}/logs/")
     writer.add_text("Configuration Parameters", json.dumps(conf))
-    #writer.add_graph(frame.get_model(), next(iter(loaders['train'])))
+    frame.add_graph(writer, next(iter(train_loader)))
     out_dir = f"{data_dir}/runs/{run_name}/models/"
-    val_loss = np.inf
+    loss_val = np.inf
     
     fn.print_conf(conf)
-    fn.log(logging.INFO, "# Training Instances = {}, # Validation Instances = {}".format(len(loaders["train"]), len(loaders["val"])))
+    fn.log(logging.INFO, "# Training Instances = {}, # Validation Instances = {}".format(len(train_loader), len(val_loader)))
 
-    for epoch in range(conf.epochs):
+    for epoch in range(1, conf.epochs+1):
         # train loop
-        loss = {}
-        start = time.time()
-        loss["train"], train_metric = fn.train_epoch(epoch, loaders["train"], frame, conf)
-        fn.log_metrics(writer, train_metric, epoch+1, "train", conf.log_opts.mask_names)
-        train_time = time.time() - start
+        loss_train, train_metric = fn.train_epoch(epoch, train_loader, frame, conf)
+        fn.log_metrics(writer, train_metric, epoch, "train", conf.log_opts.mask_names)
 
         # validation loop
-        start = time.time()
-        loss["val"], val_metric = fn.validate(epoch, loaders["val"], frame, conf)
-        fn.log_metrics(writer, val_metric, epoch+1, "val", conf.log_opts.mask_names)
-        val_time = time.time() - start
+        #new_loss_val, val_metric = fn.validate(epoch, val_loader, frame, conf)
+        #fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
+        new_loss_val = 0
 
-        if epoch % 5 == 0:
-            fn.log_images(writer, frame, loaders["train"], epoch, "train")
-            fn.log_images(writer, frame, loaders["val"], epoch, "val")
+        if (epoch-1) % 5 == 0:
+            fn.log_images(writer, frame, train_loader, epoch, "train")
+            fn.log_images(writer, frame, val_loader, epoch, "val")
 
-        writer.add_scalars("Loss", loss, epoch)
-        # Save model
-        # if epoch % conf.save_every == 0:
-        #     frame.save(out_dir, epoch)
-        # if conf.epochs - epoch <= 3:
-        #     frame.save(out_dir, epoch)
+        # Save best model
+        if new_loss_val < float(loss_val):
+            frame.save(out_dir, "best")
 
-        fn.print_metrics(conf, train_metric, val_metric)
+        loss_val = float(new_loss_val)
+        writer.add_scalars("Loss", {"train": loss_train, "val": loss_val}, epoch)
+
+        fn.print_metrics(conf, train_metric, train_metric)
+        del(train_metric)
+        del(loss_train)
+        del(new_loss_val)
+        torch.cuda.empty_cache()
         writer.flush()
+        gc.collect()
 
     frame.save(out_dir, "final")
     writer.close()

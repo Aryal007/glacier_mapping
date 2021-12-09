@@ -11,7 +11,8 @@ from shapely.geometry import Polygon, box
 from rasterio.features import rasterize
 from shapely.ops import cascaded_union
 import numpy as np
-import os, shutil
+from pathlib import Path
+import os, shutil, pdb
 
 def read_shp(filename):
     """
@@ -60,7 +61,7 @@ def check_crs(crs_a, crs_b, verbose = False):
             crs_b.to_string()):
         raise ValueError("Coordinate reference systems do not agree")
 
-def get_mask(tiff, shp, column="Id"):
+def get_mask(tiff, shp, column="Glaciers"):
     """
     This function reads the tiff filename and associated
     shp filename given and returns the numpy array mask
@@ -103,7 +104,6 @@ def get_mask(tiff, shp, column="Id"):
         bbox = box(*img_bounds)
         bbox_poly = gpd.GeoDataFrame({'geometry': bbox}, index=[0], crs=img_meta["crs"].data)
         return shp.loc[shp.intersects(bbox_poly["geometry"][0])]
-    
     classes = set(shp[column])
 
     shapefile_crs = rasterio.crs.CRS.from_string(str(shp.crs))
@@ -128,31 +128,40 @@ def get_mask(tiff, shp, column="Id"):
             channel_mask = rasterize(shapes=poly_shp, out_shape=im_size)
             mask[:,:,key] = channel_mask
         except Exception as e:
-            print(e)
-            print(value)
+            pass
+            # Already 0 if no mask
 
     return mask
 
-def add_index(tiff_np, index1, index2, comment=None):
-    rsi = np.zeros((tiff_np.shape[0], tiff_np.shape[1]))
-    if comment == "ndswi":
-        rsi = (np.log(tiff_np[:,:,index1]) - np.log(tiff_np[:,:,index2])) / (np.log(tiff_np[:,:,index1]) + np.log(tiff_np[:,:,index2]))
-    else:
-        rsi = (tiff_np[:,:,index1]-tiff_np[:,:,index2])/(tiff_np[:,:,index1]+tiff_np[:,:,index2])
-    rsi = np.nan_to_num(rsi)
+def add_index(tiff_np, index1, index2):
+    rsi = (tiff_np[:,:,index1]-tiff_np[:,:,index2])/(tiff_np[:,:,index1]+tiff_np[:,:,index2])
+    rsi = np.nan_to_num(rsi).clip(-1, 1)
     tiff_np = np.concatenate((tiff_np, np.expand_dims(rsi, axis=2)), axis=2)
     return tiff_np
 
-def save_slices(filename, tiff, mask, **conf):
+def save_slices(filename, tiff, mask, savepath, **conf):
+    _mask = np.zeros((mask.shape[0], mask.shape[1]))
+    for i in range(mask.shape[2]):
+        _mask[mask[:,:,i] == 1] = i+1
+    mask = _mask.astype(np.uint8)
+
     def verify_slice_size(slice, conf):
         if slice.shape[0] != conf["window_size"][0] or slice.shape[1] != conf["window_size"][1]:
-            temp = np.zeros((conf["window_size"][0], conf["window_size"][1]))
-            temp[0:slice.shape[0], 0:slice.shape[1]] = slice
+            if len(slice.shape) == 2:
+                temp = np.zeros((conf["window_size"][0], conf["window_size"][1]))
+                temp[0:slice.shape[0], 0:slice.shape[1]] = slice
+            else:
+                temp = np.zeros((conf["window_size"][0], conf["window_size"][1], slice.shape[2]))
+                temp[0:slice.shape[0], 0:slice.shape[1], :] = slice
             slice = temp
         return slice
 
-    def filter_percentage(slice, percentage):
-        labelled_pixels = np.sum(slice)
+    def filter_percentage(slice, percentage, type="mask"):
+        if type == "image":
+            labelled_pixels = np.sum(np.sum(slice[:,:,:5], axis=2) != 0)
+            percentage = 0.5
+        else:
+            labelled_pixels = np.sum(slice != 0)
         total_pixels = slice.shape[0] * slice.shape[1]
         if labelled_pixels/total_pixels < percentage:
             return False
@@ -165,20 +174,14 @@ def save_slices(filename, tiff, mask, **conf):
         os.makedirs(conf["out_dir"])
 
     tiff_np = np.transpose(tiff.read(), (1,2,0))
-    tiff_np = (tiff_np - np.min(tiff_np, axis=(0,1)))/(np.max(tiff_np, axis=(0,1)) - np.min(tiff_np, axis=(0,1)))
+    tiff_np = tiff_np[:,:,conf["use_bands"]]
 
     if conf["add_ndvi"]:
-        tiff_np = add_index(tiff_np, index1 = 3, index2 = 2, comment = "ndvi")
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 2)
     if conf["add_ndwi"]:
-        tiff_np = add_index(tiff_np, index1 = 1, index2 = 3, comment = "ndwi")
-    if conf["add_ndswi"]:
-        tiff_np = add_index(tiff_np, index1 = 3, index2 = 0, comment = "ndswi")
-    if conf["add_evi2"]:
-        evi2 = 2.5 * (tiff_np[:,:,3] - tiff_np[:,:,2]) / (tiff_np[:,:,3] + (2.4 * tiff_np[:,:,2]) + 1)
-        tiff_np = np.concatenate((tiff_np, np.expand_dims(evi2, axis=2)), axis=2)
-    if conf["add_osavi1"]:
-        osavi1 = (tiff_np[:,:,3] - tiff_np[:,:,2]) / (tiff_np[:,:,3] + tiff_np[:,:,2] + 0.16)
-        tiff_np = np.concatenate((tiff_np, np.expand_dims(osavi1, axis=2)), axis=2)
+        tiff_np = add_index(tiff_np, index1 = 3, index2 = 4)
+    if conf["add_ndsi"]:
+        tiff_np = add_index(tiff_np, index1 = 1, index2 = 4)
 
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):
@@ -189,37 +192,16 @@ def save_slices(filename, tiff, mask, **conf):
             if filter_percentage(mask_slice, conf["filter"]):
                 tiff_slice = tiff_np[row:row+conf["window_size"][0], column:column+conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
-                save_slice(mask_slice, conf["out_dir"]+"mask_"+str(filename)+"_slice_"+str(slicenum))
-                save_slice(tiff_slice, conf["out_dir"]+"tiff_"+str(filename)+"_slice_"+str(slicenum))
-                print(f"Saved image {filename} slice {slicenum}")
-
+                if filter_percentage(tiff_slice, conf["filter"], type="image"):
+                    mask_fname, tiff_fname = "mask_"+str(filename)+"_slice_"+str(slicenum), "tiff_"+str(filename)+"_slice_"+str(slicenum)
+                    save_slice(mask_slice, savepath / mask_fname)
+                    save_slice(tiff_slice, savepath / tiff_fname)
+                    print(f"Saved image {filename} slice {slicenum}")
             slicenum += 1
 
-    return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1))
+    return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1)), np.min(tiff_np, axis=(0,1)), np.max(tiff_np, axis=(0,1))
 
 def remove_and_create(dirpath):
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
         shutil.rmtree(dirpath)
     os.makedirs(dirpath)
-
-def train_test_shuffle(out_dir, train_split, val_split, test_split):
-    train_path = out_dir + "train/"
-    remove_and_create(train_path)
-    val_path = out_dir + "val/"
-    remove_and_create(val_path)
-    test_path = out_dir + "test/"
-    remove_and_create(test_path)
-
-    slices = [x for x in os.listdir(out_dir) if (x.endswith('.npy') and "tiff" in x )]
-    n_tiffs = len(slices)
-    random_index = np.random.permutation(n_tiffs)
-    savepath = train_path
-    for count, index in enumerate(random_index):
-        if count > int(n_tiffs*train_split):
-            savepath = val_path
-        if count > int(n_tiffs*(train_split+val_split)):
-            savepath = test_path
-        tiff_filename = slices[index]
-        mask_filename = tiff_filename.replace("tiff","mask")
-        shutil.move(out_dir+tiff_filename, savepath+tiff_filename)
-        shutil.move(out_dir+mask_filename, savepath+mask_filename)
