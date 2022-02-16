@@ -13,6 +13,7 @@ from .metrics import *
 import logging, datetime, pdb, torch
 from torchvision.utils import make_grid
 from segmentation.model.losses import *
+import matplotlib.pyplot as plt
 
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
@@ -66,7 +67,8 @@ def train_epoch(epoch, loader, frame, conf):
                 frame.step()
         else:
             frame.step()
-        loss += float(batch_loss)
+        batch_loss = float(batch_loss.detach())
+        loss += batch_loss
         y_hat = frame.segment(y_hat)
         _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
         tp += _tp
@@ -76,7 +78,7 @@ def train_epoch(epoch, loader, frame, conf):
     del(y_hat)
     del(train_iterator)
     metrics = get_metrics(tp, fp, fn, metrics_opts)
-    return loss / len(loader.dataset), metrics
+    return loss / (i+1), metrics
 
 
 def validate(epoch, loader, frame, conf):
@@ -105,7 +107,7 @@ def validate(epoch, loader, frame, conf):
     for i, (x,y) in enumerate(val_iterator):
         y_hat = frame.infer(x)
         batch_loss = frame.calc_loss(channel_first(y_hat), channel_first(y))
-        batch_loss = float(batch_loss.detach().item())
+        batch_loss = float(batch_loss.detach())
         loss += batch_loss
         y_hat = frame.segment(y_hat)
         _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
@@ -118,7 +120,7 @@ def validate(epoch, loader, frame, conf):
     del(val_iterator)
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
-    return loss / len(loader.dataset), metrics
+    return loss / (i+1), metrics
 
 def log_metrics(writer, metrics, epoch, stage, mask_names=None):
     """Log metrics for tensorboard
@@ -239,3 +241,15 @@ def print_metrics(conf, train_metric, val_metric, round=2):
         val_classes[c] = val_metric_log
     log(logging.INFO, "Train | {}".format(train_classes))
     log(logging.INFO, "Val | {}\n".format(val_classes))
+
+def get_current_lr(frame):
+    lr = frame.get_current_lr()
+    return np.float32(lr)
+
+def find_lr(frame, train_loader, init_value, final_value):
+    logs, losses = frame.find_lr(train_loader, init_value, final_value)
+    plt.plot(logs, losses)
+    plt.xlabel("learning rate (log scale)")
+    plt.ylabel("loss")
+    plt.savefig("Optimal lr curve.png")
+    print("plot saved")

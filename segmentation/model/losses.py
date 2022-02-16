@@ -15,7 +15,7 @@ class diceloss(torch.nn.Module):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w)
+        self.w = torch.tensor(w, requires_grad=True)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
@@ -89,7 +89,7 @@ class celoss(torch.nn.Module):
             raise ValueError("Loss weights should be equal to the output channels.")
             
         pred = self.act(pred)
-        ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=pred.device), label_smoothing=self.label_smoothing)(pred, torch.argmax(target, dim=1).long())
+        ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=pred.device))(pred, torch.argmax(target, dim=1).long())
         return ce
 
 class nllloss(torch.nn.Module):
@@ -144,7 +144,9 @@ class customloss(torch.nn.modules.loss._WeightedLoss):
         target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
         _pred = self.act(pred)
         ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=_pred.device))(_pred, torch.argmax(target, dim=1).long())
+        pred = self.act(pred).permute(0,2,3,1)
+        target = target.permute(0,2,3,1)
         dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
         dice = dice * self.w.to(device=dice.device)
 
-        return dice.sum() + 2 * ce
+        return 0.75 * dice.sum() + 0.25 * ce

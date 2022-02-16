@@ -12,6 +12,7 @@ import segmentation.model.functions as fn
 import yaml, json, pathlib, warnings, pdb, torch, logging, time, gc
 from torch.utils.tensorboard import SummaryWriter
 from addict import Dict
+import matplotlib.pyplot as plt
 import numpy as np
 
 warnings.filterwarnings("ignore")
@@ -43,10 +44,14 @@ if __name__ == "__main__":
         frame.load_state_dict(state_dict)
         frame.freeze_layers()
 
+    
+    if conf.find_lr:
+        fn.find_lr(frame, train_loader, init_value=1e-9, final_value=10)
+        exit()
+
     # Setup logging
     writer = SummaryWriter(f"{data_dir}/runs/{run_name}/logs/")
     writer.add_text("Configuration Parameters", json.dumps(conf))
-    frame.add_graph(writer, next(iter(train_loader)))
     out_dir = f"{data_dir}/runs/{run_name}/models/"
     loss_val = np.inf
     
@@ -59,25 +64,27 @@ if __name__ == "__main__":
         fn.log_metrics(writer, train_metric, epoch, "train", conf.log_opts.mask_names)
 
         # validation loop
-        #new_loss_val, val_metric = fn.validate(epoch, val_loader, frame, conf)
-        #fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
-        new_loss_val = 0
+        new_loss_val, val_metric = fn.validate(epoch, val_loader, frame, conf)
+        fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
 
         if (epoch-1) % 5 == 0:
             fn.log_images(writer, frame, train_loader, epoch, "train")
             fn.log_images(writer, frame, val_loader, epoch, "val")
 
         # Save best model
-        if new_loss_val < float(loss_val):
+        if new_loss_val < loss_val:
             frame.save(out_dir, "best")
-
-        loss_val = float(new_loss_val)
-        writer.add_scalars("Loss", {"train": loss_train, "val": loss_val}, epoch)
+            loss_val = float(new_loss_val)
+        
+        lr = fn.get_current_lr(frame)
+        writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
+        writer.add_scalar("lr", lr, epoch)
 
         fn.print_metrics(conf, train_metric, train_metric)
         del(train_metric)
         del(loss_train)
         del(new_loss_val)
+        del(lr)
         torch.cuda.empty_cache()
         writer.flush()
         gc.collect()

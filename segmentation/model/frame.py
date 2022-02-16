@@ -14,9 +14,9 @@ from .unet import *
 from .metrics import *
 
 import numpy as np
-import os, pdb, torch
+import os, pdb, torch, math
 from pathlib import Path
-from torch.optim.lr_scheduler import ReduceLROnPlateau, ExponentialLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
 
 class Framework:
     """
@@ -43,14 +43,16 @@ class Framework:
         self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose = True, 
-                                             patience=2,
-                                             factor = 0.75,
+                                             patience = 4,
+                                             factor = 0.25,
                                              min_lr = 1e-9)
+        self.lrscheduler2 = CyclicLR(self.optimizer, 
+                                    base_lr=optimizer_opts["args"]["lr"]*0.1, 
+                                    max_lr=optimizer_opts["args"]["lr"], 
+                                    mode = 'triangular2', step_size_up = 20,
+                                    verbose=True, cycle_momentum=False)
         #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
-
-    def add_graph(self, writer, input):
-        writer.add_graph(self.model, input_to_model = input[0].permute((0,3,1,2)).to(self.device))
 
     def optimize(self, x, y):
         """
@@ -69,10 +71,14 @@ class Framework:
         
         loss = self.calc_loss(y_hat, y)
         loss.backward()
-        return y_hat.permute(0, 2, 3, 1), float(loss.detach().item())
+        return y_hat.permute(0, 2, 3, 1), loss
     
     def zero_grad(self):
         self.optimizer.zero_grad()
+
+    def get_current_lr(self):
+        for param_group in self.optimizer.param_groups:
+            return param_group['lr']
 
     def step(self):
         self.optimizer.step()
@@ -81,8 +87,8 @@ class Framework:
         """
         Update the LR Scheduler
         """
-        #self.lrscheduler2.step()
-        self.lrscheduler.step(val_loss)
+        self.lrscheduler2.step()
+        #self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
         """
@@ -223,3 +229,37 @@ class Framework:
         for i, layer in enumerate(self.model.parameters()):
             if i < 60: # Freeze 60 out of 75 layers, retrain on last 15 only
                 layer.requires_grad = False
+
+    def find_lr(self, train_loader, init_value, final_value):
+        number_in_epoch = len(train_loader) - 1
+        update_step = (final_value / init_value) ** (1 / number_in_epoch)
+        lr = init_value
+        self.optimizer.param_groups[0]["lr"] = lr
+        best_loss = 0.0
+        batch_num = 0
+        losses = []
+        log_lrs = []
+        for data in train_loader:
+            batch_num += 1
+            inputs, labels = data
+            self.optimizer.zero_grad()
+            inputs = inputs.permute(0, 3, 1, 2).to(self.device)
+            labels = labels.permute(0, 3, 1, 2).to(self.device)
+            outputs = self.model(inputs)
+            loss = self.calc_loss(outputs, labels)
+            # Crash out if loss explodes
+            if batch_num > 1 and loss > 4 * best_loss:
+                return log_lrs[10:-5], losses[10:-5]
+            # Record the best loss
+            if loss < best_loss or batch_num == 1:
+                best_loss = loss
+            # Store the values
+            losses.append(loss)
+            log_lrs.append(math.log10(lr))
+            # Do the backward pass and optimize
+            loss.backward()
+            self.optimizer.step()
+            # Update the lr for the next step and store
+            lr = lr * update_step
+            self.optimizer.param_groups[0]["lr"] = lr
+        return log_lrs[10:-5], losses[10:-5]

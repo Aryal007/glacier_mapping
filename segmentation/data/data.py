@@ -36,9 +36,9 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                        num_workers=0, shuffle=shuffle)
+                        num_workers=8, shuffle=shuffle)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                        num_workers=0, shuffle=shuffle)
+                        num_workers=8, shuffle=shuffle)
     del(train_dataset)
     del(val_dataset)
     gc.collect()

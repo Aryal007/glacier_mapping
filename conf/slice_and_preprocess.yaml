@@ -4,10 +4,7 @@ out_dir: "/datadrive/HKH/processed/"
 window_size: [512,512]
 overlap: 32
 filter: 0.01
-train_split: 0.6 
-val_split: 0.2
 add_ndvi: True
 add_ndwi: True
 add_ndsi: True
-bands: ['B1','B2','B3','B4','B5','B6_VCID_1','B6_VCID_2','B7','B8','BQA','elevation','slope']
-use_bands: [0,1,2,3,4,5,6,7,8,10,11]
+bands: ['B1','B2','B3','B4','B5','B6_VCID_1','B6_VCID_2','B7','elevation','slope']

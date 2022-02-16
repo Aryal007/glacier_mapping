@@ -17,6 +17,7 @@ warnings.filterwarnings("ignore")
 conf = Dict(yaml.safe_load(open('./conf/slice_and_preprocess.yaml')))
 
 df = pd.read_csv(Path(conf.image_dir) / 'metadata.csv')
+#saved_df = pd.DataFrame(columns=["Landsat ID", ""])
 train_df = df[df.split == "train"]
 val_ids = [
             '133041','133040','134040','135040',
