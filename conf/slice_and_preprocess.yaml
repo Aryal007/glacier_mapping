@@ -1,6 +1,6 @@
-image_dir: "/datadrive/HKH/tiff_images/"
-labels_dir: "/datadrive/HKH/labels/"
-out_dir: "/datadrive/HKH/processed/"
+image_dir: "/data/baryal/HKH_new/Landsat/"
+labels_dir: "/data/baryal/HKH_new/labels/"
+out_dir: "/data/baryal/HKH_new/processed/"
 window_size: [512,512]
 overlap: 32
 filter: 0.01
@@ -8,3 +8,4 @@ add_ndvi: True
 add_ndwi: True
 add_ndsi: True
 bands: ['B1','B2','B3','B4','B5','B6_VCID_1','B6_VCID_2','B7','elevation','slope']
+use_bands: [0,1,2,3,4,5,6,7,8,9]

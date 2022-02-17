@@ -15,6 +15,7 @@ from .metrics import *
 
 import numpy as np
 import os, pdb, torch, math
+from tqdm import tqdm
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
 
@@ -239,7 +240,8 @@ class Framework:
         batch_num = 0
         losses = []
         log_lrs = []
-        for data in train_loader:
+        iterator = tqdm(train_loader, desc="Current lr=XX.XX Steps=XX Loss=XX.XX Best lr=XX.XX ")
+        for i, data in enumerate(iterator):
             batch_num += 1
             inputs, labels = data
             self.optimizer.zero_grad()
@@ -253,12 +255,14 @@ class Framework:
             # Record the best loss
             if loss < best_loss or batch_num == 1:
                 best_loss = loss
-            # Store the values
-            losses.append(loss)
-            log_lrs.append(math.log10(lr))
+                best_lr = lr
             # Do the backward pass and optimize
             loss.backward()
             self.optimizer.step()
+            iterator.set_description("Current lr=%5.9f Steps=%d Loss=%5.3f Best lr=%5.9f " %(lr, i, loss, best_lr))
+            # Store the values
+            losses.append(loss.detach())
+            log_lrs.append(math.log10(lr))
             # Update the lr for the next step and store
             lr = lr * update_step
             self.optimizer.param_groups[0]["lr"] = lr

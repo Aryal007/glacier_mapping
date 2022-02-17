@@ -1,14 +1,14 @@
-data_dir: "/data/baryal/HKH/processed"
+data_dir: "/data/baryal/HKH_new/processed"
 class_name: ["Clean Ice", "Debris Covered"]
 batch_size: 4
-run_name: "g_original"
+run_name: "a_ce"
 epochs: 101
 save_every: None
-use_channels: [0,1,2,3,4,5,6,7,8,10,11,12,13]
+use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 loss_opts:
   name: "dice"
   masked: True
-  weights: [0.015, 0.15, 0.84]
+  weights: [0.02, 0.11, 1.1]
   label_smoothing: 0.1
 model_opts:
   args: 
@@ -21,7 +21,7 @@ model_opts:
 optim_opts:
   name: "Adam"
   args:
-    lr: 0.0001
+    lr: 0.002
 log_opts:
   mask_names: ["Background", "Clean Ice", "Debris Covered"]
 metrics_opts: ["IoU", "precision", "recall"]

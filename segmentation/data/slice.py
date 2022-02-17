@@ -139,8 +139,9 @@ def add_index(tiff_np, index1, index2):
     tiff_np = np.concatenate((tiff_np, np.expand_dims(rsi, axis=2)), axis=2)
     return tiff_np
 
-def save_slices(filename, tiff, mask, savepath, **conf):
+def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **conf):
     _mask = np.zeros((mask.shape[0], mask.shape[1]))
+    roi_mask = np.squeeze(roi_mask) == 0
     for i in range(mask.shape[2]):
         _mask[mask[:,:,i] == 1] = i+1
     mask = _mask.astype(np.uint8)
@@ -170,11 +171,19 @@ def save_slices(filename, tiff, mask, savepath, **conf):
     def save_slice(arr, filename):
         np.save(filename, arr)
 
+    def get_pixel_count(tiff_slice, mask_slice):
+        mas = np.sum(np.sum(tiff_slice[:,:,:3], axis=2) == 0)
+        deb, ci = np.sum(mask_slice == 1), np.sum(mask_slice == 2)
+        bg = mask_slice.shape[0]*mask_slice.shape[1] - (ci + deb + mas)
+        return bg, ci, deb, mas 
+
     if not os.path.exists(conf["out_dir"]):
         os.makedirs(conf["out_dir"])
 
     tiff_np = np.transpose(tiff.read(), (1,2,0))
     tiff_np = tiff_np[:,:,conf["use_bands"]]
+    tiff_np[roi_mask] = 0
+    tiff_np = tiff_np.astype(np.float16)
 
     if conf["add_ndvi"]:
         tiff_np = add_index(tiff_np, index1 = 3, index2 = 2)
@@ -182,7 +191,7 @@ def save_slices(filename, tiff, mask, savepath, **conf):
         tiff_np = add_index(tiff_np, index1 = 3, index2 = 4)
     if conf["add_ndsi"]:
         tiff_np = add_index(tiff_np, index1 = 1, index2 = 4)
-
+    
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):
         for column in range(0, tiff_np.shape[0], conf["window_size"][1]-conf["overlap"]):
@@ -193,13 +202,16 @@ def save_slices(filename, tiff, mask, savepath, **conf):
                 tiff_slice = tiff_np[row:row+conf["window_size"][0], column:column+conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
                 if filter_percentage(tiff_slice, conf["filter"], type="image"):
-                    mask_fname, tiff_fname = "mask_"+str(filename)+"_slice_"+str(slicenum), "tiff_"+str(filename)+"_slice_"+str(slicenum)
+                    mask_fname, tiff_fname = "mask_"+str(filenum)+"_slice_"+str(slicenum), "tiff_"+str(filenum)+"_slice_"+str(slicenum)
+                    bg, ci, deb, mas = get_pixel_count(tiff_slice, mask_slice)
+                    _row = [filename, filenum, slicenum, bg, ci, deb, mas, bg/(bg+ci+deb+mas), ci/(bg+ci+deb+mas), deb/(bg+ci+deb+mas), mas/(bg+ci+deb+mas), os.path.basename(savepath)]
+                    saved_df.loc[len(saved_df.index)] = _row
                     save_slice(mask_slice, savepath / mask_fname)
                     save_slice(tiff_slice, savepath / tiff_fname)
-                    print(f"Saved image {filename} slice {slicenum}")
+                    print(f"Saved image {filenum} slice {slicenum}")
             slicenum += 1
 
-    return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1)), np.min(tiff_np, axis=(0,1)), np.max(tiff_np, axis=(0,1))
+    return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1)), np.min(tiff_np, axis=(0,1)), np.max(tiff_np, axis=(0,1)), saved_df
 
 def remove_and_create(dirpath):
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
