@@ -104,7 +104,8 @@ def get_mask(tiff, shp, column="Glaciers"):
         bbox = box(*img_bounds)
         bbox_poly = gpd.GeoDataFrame({'geometry': bbox}, index=[0], crs=img_meta["crs"].data)
         return shp.loc[shp.intersects(bbox_poly["geometry"][0])]
-    classes = set(shp[column])
+    classes = sorted(list(set(shp[column])))
+    print(f"Classes = {classes}")
 
     shapefile_crs = rasterio.crs.CRS.from_string(str(shp.crs))
 
