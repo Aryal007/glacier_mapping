@@ -80,7 +80,7 @@ if __name__ == "__main__":
         writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
         writer.add_scalar("lr", lr, epoch)
 
-        fn.print_metrics(conf, train_metric, train_metric)
+        fn.print_metrics(conf, train_metric, val_metric)
         del(train_metric)
         del(loss_train)
         del(new_loss_val)

@@ -36,9 +36,9 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                        num_workers=8, shuffle=shuffle)
+                        num_workers=2, shuffle=shuffle)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                        num_workers=8, shuffle=shuffle)
+                        num_workers=2, shuffle=shuffle)
     del(train_dataset)
     del(val_dataset)
     gc.collect()
@@ -64,9 +64,9 @@ class CoastalDataset(Dataset):
         if self.normalize:
             arr = np.load(folder_path.parent / "normalize.npy")
             self.mean, self.std = arr[0][use_channels], arr[1][use_channels]
-        self.min = np.asarray([0,0,0,0,0,0,0,0,0,0,0,-1,-1])
+        self.min = np.asarray([0,0,0,0,0,0,0,0,0,0,-1,-1,-1])
         self.max = np.asarray([255,255,255,255,255,255, 255, 255,
-                                255, 90, 1, 1, 1])
+                                8000, 85, 1, 1, 1])
 
     def __getitem__(self, index):
 
@@ -78,6 +78,8 @@ class CoastalDataset(Dataset):
         """
         data = np.load(self.img_files[index])
         data = data[:,:,self.use_channels]  
+        self.min, self.max = self.min[self.use_channels], self.max[self.use_channels]
+        data = np.clip(data, self.min, self.max)
         data = (data - self.min) / (self.max - self.min)
         label = np.expand_dims(np.load(self.mask_files[index]), axis=2)
         ones = label == 1
