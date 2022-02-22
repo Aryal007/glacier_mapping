@@ -45,7 +45,7 @@ class Framework:
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose = True, 
                                              patience = 4,
-                                             factor = 0.25,
+                                             factor = 0.1,
                                              min_lr = 1e-9)
         self.lrscheduler2 = CyclicLR(self.optimizer, 
                                     base_lr=optimizer_opts["args"]["lr"]*0.1, 
@@ -141,7 +141,7 @@ class Framework:
         return loss
 
 
-    def metrics(self, y_hat, y, masked):
+    def metrics(self, y_hat, y, mask, threshold):
         """ Loop over metrics in train.yaml
 
         Args:
@@ -152,22 +152,20 @@ class Framework:
             results
 
         """
-        y_hat = y_hat.to(self.device)
-        y = y.to(self.device)
         n_classes = y.shape[3]
+        _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2]))
+        y_hat = y_hat.detach().cpu().numpy()
+        for i in range(1, n_classes):
+            _y_hat[y_hat[:,:,:,i] >= threshold[i-1]] = i+1
+        _y_hat[_y_hat == 0] = 1
+        _y_hat[mask] = 0
+        y_hat= _y_hat
 
-        if masked:
-            mask = torch.sum(y, dim=3) == 0
-
-        y_hat = np.argmax(y_hat.cpu().numpy(), axis=3)+1
         y = np.argmax(y.cpu().numpy(), axis=3)+1
-
-        if masked:
-            y_hat[mask] = 0
-            y[mask] = 0
+        y[mask] = 0
         
         tp, fp, fn = torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
-        for i in range(n_classes):
+        for i in range(0, n_classes):
             _y_hat = (y_hat == i+1).astype(np.uint8)
             _y = (y == i+1).astype(np.uint8)
             _tp, _fp, _fn = tp_fp_fn(_y_hat, _y)

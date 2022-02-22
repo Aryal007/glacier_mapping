@@ -52,7 +52,7 @@ def train_epoch(epoch, loader, frame, conf):
     :return (train_loss, metrics): A tuple containing the average epoch loss
       and the metrics on the training set.
     """
-    metrics_opts, masked, n_classes, grad_accumulation_steps = conf.metrics_opts, conf.loss_masked, len(conf.log_opts.mask_names), conf.grad_accumulation_steps
+    metrics_opts, n_classes, threshold, grad_accumulation_steps = conf.metrics_opts, len(conf.log_opts.mask_names), conf.threshold, conf.grad_accumulation_steps
     loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     train_iterator = tqdm(loader, desc="Train Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     for i, (x,y) in enumerate(train_iterator):
@@ -69,14 +69,13 @@ def train_epoch(epoch, loader, frame, conf):
             frame.step()
         batch_loss = float(batch_loss.detach())
         loss += batch_loss
-        y_hat = frame.segment(y_hat)
-        _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
+        y_hat = frame.act(y_hat)
+        mask = torch.sum(x[:,:,:,:5], dim=3) == 0
+        _tp, _fp, _fn = frame.metrics(y_hat, y, mask, threshold)
         tp += _tp
         fp += _fp 
         fn += _fn 
         train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
-    del(y_hat)
-    del(train_iterator)
     metrics = get_metrics(tp, fp, fn, metrics_opts)
     return loss / (i+1), metrics
 
@@ -100,7 +99,7 @@ def validate(epoch, loader, frame, conf):
     :return (val_loss, metrics): A tuple containing the average validation loss
       and the metrics on the validation set.
     """
-    metrics_opts, masked, n_classes = conf.metrics_opts, conf.loss_masked, len(conf.log_opts.mask_names)
+    metrics_opts, threshold, n_classes = conf.metrics_opts, conf.threshold, len(conf.log_opts.mask_names)
     loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     val_iterator = tqdm(loader, desc="Val Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     channel_first = lambda x: x.permute(0, 3, 1, 2)
@@ -109,15 +108,13 @@ def validate(epoch, loader, frame, conf):
         batch_loss = frame.calc_loss(channel_first(y_hat), channel_first(y))
         batch_loss = float(batch_loss.detach())
         loss += batch_loss
-        y_hat = frame.segment(y_hat)
-        _tp, _fp, _fn = frame.metrics(y_hat, y, masked)
+        y_hat = frame.act(y_hat)
+        mask = torch.sum(x[:,:,:,:5], dim=3) == 0
+        _tp, _fp, _fn = frame.metrics(y_hat, y, mask, threshold)
         tp += _tp 
         fp += _fp 
         fn += _fn 
         val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
-        del(y_hat)
-    del(channel_first)
-    del(val_iterator)
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
     return loss / (i+1), metrics
@@ -137,7 +134,7 @@ def log_metrics(writer, metrics, epoch, stage, mask_names=None):
         for name, metric in zip(mask_names, v):
             writer.add_scalar(f"{stage}_{str(k)}/{name}", metric, epoch)
 
-def log_images(writer, frame, batch, epoch, stage):
+def log_images(writer, frame, batch, epoch, stage, threshold):
     """Log images for tensorboard
 
     Args:
@@ -163,8 +160,17 @@ def log_images(writer, frame, batch, epoch, stage):
     y_mask = np.sum(y.cpu().numpy(), axis=3) == 0
     y_hat = frame.act(frame.infer(x))
     y = np.argmax(y.cpu().numpy(), axis=3) + 1
-    y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
-    #y_hat = y_hat.cpu().numpy()[:,:,:,1][:,:,:,None]
+    
+    _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2]))
+    y_hat = y_hat.cpu().numpy()
+    for i in range(1, 3):
+        _y_hat[y_hat[:,:,:,i] >= threshold[i-1]] = i+1
+    _y_hat[_y_hat == 0] = 1
+    _y_hat[y_mask] = 0
+    y_hat = _y_hat
+
+    #y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
+
     y[y_mask] = 0
     y_hat[y_mask] = 0
     _y = np.zeros((y.shape[0], y.shape[1], y.shape[2], 3))
@@ -219,7 +225,7 @@ def get_metrics(tp, fp, fn, metrics_opts):
     Args:
         metrics (dict(troch.Tensor)): the matrix to get mean of
     """
-    metrics = dict.fromkeys(metrics_opts, np.zeros(2))
+    metrics = dict.fromkeys(metrics_opts, 0)
     for metric, arr in metrics.items():
         metric_fun = globals()[metric]
         metrics[metric] = metric_fun(tp, fp, fn)

@@ -56,7 +56,7 @@ print("Saving training slices completed!!!")
 means = np.mean(np.asarray(means), axis=0)
 stds = np.mean(np.asarray(stds), axis=0)
 mins = np.min(np.asarray(mins), axis=0)
-maxs = np.mean(np.asarray(maxs), axis=0)
+maxs = np.max(np.asarray(maxs), axis=0)
 
 np.save(conf.out_dir+"normalize_train", np.asarray((means, stds, mins, maxs)))
 
@@ -78,7 +78,7 @@ print("Saving validation slices completed!!!")
 means = np.mean(np.asarray(means), axis=0)
 stds = np.mean(np.asarray(stds), axis=0)
 mins = np.min(np.asarray(mins), axis=0)
-maxs = np.mean(np.asarray(maxs), axis=0)
+maxs = np.max(np.asarray(maxs), axis=0)
 
 np.save(conf.out_dir+"normalize_val", np.asarray((means, stds, mins, maxs)))
 saved_df.to_csv(conf.out_dir+"slice_meta.csv", encoding='utf-8', index=False)

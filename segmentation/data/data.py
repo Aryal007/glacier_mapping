@@ -13,7 +13,7 @@ import torch
 import elasticdeform
 from torchvision import transforms
 
-def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
+def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False,
                   train_folder='train', val_folder='val', test_folder='',
                   shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
@@ -23,7 +23,6 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
     Return:
         Returns train and val dataloaders
     """
-    normalize = False
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
                                     transforms = transforms.Compose([
                                                DropoutChannels(0.2),
@@ -39,9 +38,6 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1],
                         num_workers=2, shuffle=shuffle)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
                         num_workers=2, shuffle=shuffle)
-    del(train_dataset)
-    del(val_dataset)
-    gc.collect()
     return train_loader, val_loader
 
 class CoastalDataset(Dataset):
@@ -50,7 +46,7 @@ class CoastalDataset(Dataset):
     binary mask
     """
 
-    def __init__(self, folder_path, use_channels, normalize=False, transforms=None):
+    def __init__(self, folder_path, use_channels, normalize, transforms=None):
         """Initialize dataset.
         Args:
             folder_path(str): A path to data directory
@@ -61,12 +57,11 @@ class CoastalDataset(Dataset):
         self.use_channels = use_channels
         self.normalize = normalize
         self.transforms = transforms
-        if self.normalize:
-            arr = np.load(folder_path.parent / "normalize.npy")
+        arr = np.load(folder_path.parent / "normalize_train.npy")
+        if self.normalize == "min-max":
+            self.min, self.max = arr[2][use_channels], arr[3][use_channels]
+        if self.normalize == "mean-std":
             self.mean, self.std = arr[0][use_channels], arr[1][use_channels]
-        self.min = np.asarray([0,0,0,0,0,0,0,0,0,0,-1,-1,-1])
-        self.max = np.asarray([255,255,255,255,255,255, 255, 255,
-                                8000, 85, 1, 1, 1])
 
     def __getitem__(self, index):
 
@@ -78,22 +73,21 @@ class CoastalDataset(Dataset):
         """
         data = np.load(self.img_files[index])
         data = data[:,:,self.use_channels]  
-        self.min, self.max = self.min[self.use_channels], self.max[self.use_channels]
-        data = np.clip(data, self.min, self.max)
-        data = (data - self.min) / (self.max - self.min)
+        if self.normalize == "min-max":
+            data = np.clip(data, self.min, self.max)
+            data = (data - self.min) / (self.max - self.min)
+        elif self.normalize == "mean-std":
+            data = (data - self.mean) / self.std
+        else:
+            raise ValueError("normalize must be min-max or mean-std")
         label = np.expand_dims(np.load(self.mask_files[index]), axis=2)
         ones = label == 1
         twos = label == 2
         zeros = np.invert(ones+twos)
         label = np.concatenate((zeros, ones, twos), axis=2)
-        del(ones)
-        del(twos)
-        del(zeros)
         label[np.sum(data[:, :, :7], axis=2) == 0] = 0
         if self.transforms:
             sample = {'image': data, 'mask': label}
-            del(data)
-            del(label)
             sample = self.transforms(sample)
             data = torch.from_numpy(sample['image'].copy()).float()
             label = torch.from_numpy(sample['mask'].copy()).float()

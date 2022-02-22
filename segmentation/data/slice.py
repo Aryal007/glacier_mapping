@@ -13,6 +13,7 @@ from shapely.ops import cascaded_union
 import numpy as np
 from pathlib import Path
 import os, shutil, pdb
+from skimage.color import rgb2hsv
 
 def read_shp(filename):
     """
@@ -192,6 +193,10 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
         tiff_np = add_index(tiff_np, index1 = 3, index2 = 4)
     if conf["add_ndsi"]:
         tiff_np = add_index(tiff_np, index1 = 1, index2 = 4)
+    if conf["add_hsv"]:
+        rgb_img = tiff_np[:,:,:3]/255
+        hsv_img = rgb2hsv(rgb_img[:,:,[2,1,0]])
+        tiff_np = np.concatenate((tiff_np, hsv_img), axis=2)
     
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0]-conf["overlap"]):
@@ -212,6 +217,9 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
                     print(f"Saved image {filenum} slice {slicenum}")
             slicenum += 1
 
+    tiff_np = np.nan_to_num(tiff_np.astype(np.float64))
+    if np.isnan(np.sum(np.std(tiff_np, axis=(0,1)))):
+        print("***********NaN Value encountered**************")
     return np.mean(tiff_np, axis=(0,1)), np.std(tiff_np, axis=(0,1)), np.min(tiff_np, axis=(0,1)), np.max(tiff_np, axis=(0,1)), saved_df
 
 def remove_and_create(dirpath):
