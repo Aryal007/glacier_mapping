@@ -164,7 +164,7 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
             labelled_pixels = np.sum(np.sum(slice[:,:,:5], axis=2) != 0)
             percentage = 0.5
         else:
-            labelled_pixels = np.sum(slice != 0)
+            labelled_pixels = np.sum(slice == 2)
         total_pixels = slice.shape[0] * slice.shape[1]
         if labelled_pixels/total_pixels < percentage:
             return False
@@ -174,8 +174,10 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
         np.save(filename, arr)
 
     def get_pixel_count(tiff_slice, mask_slice):
-        mas = np.sum(np.sum(tiff_slice[:,:,:3], axis=2) == 0)
+        mas = np.sum(tiff_slice[:,:,:5], axis=2) == 0
+        mask_slice[mas] = 0
         deb, ci = np.sum(mask_slice == 1), np.sum(mask_slice == 2)
+        mas = np.sum(mas)
         bg = mask_slice.shape[0]*mask_slice.shape[1] - (ci + deb + mas)
         return bg, ci, deb, mas 
 
@@ -210,7 +212,11 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
                 if filter_percentage(tiff_slice, conf["filter"], type="image"):
                     mask_fname, tiff_fname = "mask_"+str(filenum)+"_slice_"+str(slicenum), "tiff_"+str(filenum)+"_slice_"+str(slicenum)
                     bg, ci, deb, mas = get_pixel_count(tiff_slice, mask_slice)
-                    _row = [filename, filenum, slicenum, bg, ci, deb, mas, bg/(bg+ci+deb+mas), ci/(bg+ci+deb+mas), deb/(bg+ci+deb+mas), mas/(bg+ci+deb+mas), os.path.basename(savepath)]
+                    _tot = bg+ci+deb+mas
+                    _row = [filename, filenum, slicenum, 
+                            bg, ci, deb, mas, 
+                            bg/_tot, ci/_tot, deb/_tot, mas/_tot, 
+                            os.path.basename(savepath)]
                     saved_df.loc[len(saved_df.index)] = _row
                     save_slice(mask_slice, savepath / mask_fname)
                     save_slice(tiff_slice, savepath / tiff_fname)

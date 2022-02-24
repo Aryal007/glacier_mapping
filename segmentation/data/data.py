@@ -25,11 +25,11 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=Fa
     """
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
                                     transforms = transforms.Compose([
-                                               DropoutChannels(0.2),
-                                               FlipHorizontal(0.2),
-                                               FlipVertical(0.2),
-                                               Rot270(0.2),
-                                               Cut(0.2)
+                                               DropoutChannels(0.5),
+                                               FlipHorizontal(0.5),
+                                               FlipVertical(0.5),
+                                               Rot270(0.5),
+                                               Cut(0.5)
                                            ])
                                     )
     val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
@@ -73,6 +73,7 @@ class CoastalDataset(Dataset):
         """
         data = np.load(self.img_files[index])
         data = data[:,:,self.use_channels]  
+        _mask = np.sum(data[:, :, :7], axis=2) == 0
         if self.normalize == "min-max":
             data = np.clip(data, self.min, self.max)
             data = (data - self.min) / (self.max - self.min)
@@ -85,7 +86,7 @@ class CoastalDataset(Dataset):
         twos = label == 2
         zeros = np.invert(ones+twos)
         label = np.concatenate((zeros, ones, twos), axis=2)
-        label[np.sum(data[:, :, :7], axis=2) == 0] = 0
+        label[_mask] = 0
         if self.transforms:
             sample = {'image': data, 'mask': label}
             sample = self.transforms(sample)

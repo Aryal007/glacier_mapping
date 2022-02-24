@@ -77,7 +77,9 @@ def train_epoch(epoch, loader, frame, conf):
         fn += _fn 
         train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
     metrics = get_metrics(tp, fp, fn, metrics_opts)
-    return loss / (i+1), metrics
+    loss_weights = frame.get_loss_weights().detach().numpy()
+    
+    return loss / (i+1), metrics, loss_weights
 
 
 def validate(epoch, loader, frame, conf):
@@ -117,6 +119,7 @@ def validate(epoch, loader, frame, conf):
         val_iterator.set_description("Val,   Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
     frame.val_operations(loss/len(loader.dataset))
     metrics = get_metrics(tp, fp, fn, metrics_opts)  
+
     return loss / (i+1), metrics
 
 def log_metrics(writer, metrics, epoch, stage, mask_names=None):
@@ -134,7 +137,7 @@ def log_metrics(writer, metrics, epoch, stage, mask_names=None):
         for name, metric in zip(mask_names, v):
             writer.add_scalar(f"{stage}_{str(k)}/{name}", metric, epoch)
 
-def log_images(writer, frame, batch, epoch, stage, threshold):
+def log_images(writer, frame, batch, epoch, stage, threshold, normalize_name, normalize):
     """Log images for tensorboard
 
     Args:
@@ -181,8 +184,14 @@ def log_images(writer, frame, batch, epoch, stage, threshold):
         _y_hat[y_hat == i] = colors[i]
     y = _y
     y_hat = _y_hat
-    x = torch.clamp(x, 0, 1)
-    writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[4,3,1]]))), epoch)
+    if normalize_name == "mean-std":
+        x = (x*normalize[1])+normalize[0]
+    else:
+        x = torch.clamp(x, 0, 1)    
+    try:
+        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[4,3,1]]))), epoch)
+    except Exception as e:
+        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:,:,:,[0,1,2]]))), epoch)
     writer.add_image(f"{stage}/y", make_grid(pm(squash(torch.tensor(y)))), epoch)    
     writer.add_image(f"{stage}/y_hat", make_grid(pm(squash(torch.tensor(y_hat)))), epoch)
     
@@ -198,23 +207,17 @@ def get_loss(outchannels, opts=None):
     else:
         label_smoothing = opts.label_smoothing
     if opts.name == "dice":
-        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), w=loss_weight,
-                            outchannels=outchannels, label_smoothing=label_smoothing, masked=opts.masked)
+        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, label_smoothing=label_smoothing, masked=opts.masked)
     elif opts.name == "iou":
-        loss_fn = iouloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts.masked)
+        loss_fn = iouloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)
     elif opts.name == "ce":
-        loss_fn = celoss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts.masked)
+        loss_fn = celoss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)
     elif opts.name == "nll":
-        loss_fn = nllloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts.masked)
+        loss_fn = nllloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)
     elif opts.name == "focal":
-        loss_fn = focalloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts.masked)
+        loss_fn = focalloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)
     elif opts.name == "custom":
-        loss_fn = customloss(act=torch.nn.Softmax(dim=1), w=loss_weight, 
-                            outchannels=outchannels, masked = opts.masked)                  
+        loss_fn = customloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)                  
     else:
         raise ValueError("Loss must be defined!")
     return loss_fn

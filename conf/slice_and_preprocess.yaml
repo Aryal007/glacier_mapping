@@ -3,7 +3,7 @@ labels_dir: "/data/baryal/HKH_new/labels/"
 out_dir: "/data/baryal/HKH_new/processed_new/"
 window_size: [512,512]
 overlap: 32
-filter: 0.1
+filter: 0.01
 add_ndvi: True
 add_ndwi: True
 add_ndsi: True

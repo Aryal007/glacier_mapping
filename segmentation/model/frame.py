@@ -26,7 +26,7 @@ class Framework:
     """
 
     def __init__(self, loss_fn, model_opts=None, optimizer_opts=None,
-                 reg_opts=None, device=None):
+                 reg_opts=None, loss_opts=None, device=None):
         """
         Set Class Attrributes
         """
@@ -41,7 +41,12 @@ class Framework:
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
-        self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
+        #self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
+        self.loss_weights = torch.tensor(loss_opts.weights).to(self.device)
+        if loss_opts.dynamic:
+            self.loss_weights = self.loss_weights.requires_grad_()
+        self.optimizer = optimizer_def([{'params': self.model.parameters(), **optimizer_opts["args"]},
+                                        {'params': self.loss_weights, **optimizer_opts["args"]}])
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose = True, 
                                              patience = 4,
@@ -129,6 +134,8 @@ class Framework:
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
         loss = self.loss_fn(y_hat, y)
+        loss = loss*self.loss_weights
+        loss = loss.sum()
         if self.reg_opts:
             for reg_type in self.reg_opts.keys():
                 reg_fun = globals()[reg_type]
@@ -140,6 +147,8 @@ class Framework:
                 loss += penalty
         return loss
 
+    def get_loss_weights(self):
+        return self.loss_weights.cpu()
 
     def metrics(self, y_hat, y, mask, threshold):
         """ Loop over metrics in train.yaml

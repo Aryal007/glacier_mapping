@@ -11,54 +11,38 @@ import torch, pdb
 from torchvision.ops import sigmoid_focal_loss
 
 class diceloss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w, requires_grad=True)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
 
     def forward(self, pred, target):
-        if len(self.w) != self.outchannels:
-            raise ValueError("Loss weights should be equal to the output channels.")
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
             mask = torch.ones((target.size()[0], target.size()[2], target.size()[3]), dtype=torch.bool)
+
         target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
 
         pred = self.act(pred).permute(0,2,3,1)
         target = target.permute(0,2,3,1)
-        #intersection = (pred * target)[mask].sum(dim=0)
-        #A_sum = pred[mask].sum(dim=0)
-        #B_sum = target[mask].sum(dim=0)
-        #total_sum = A_sum + B_sum
-        #del(A_sum)
-        #del(B_sum)
-        #dice = 1 - ((2.0 * intersection + self.smooth) / (total_sum + self.smooth))
-        #del(intersection)
-        #del(total_sum)
         dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
-        dice = dice * self.w.to(device=dice.device)
-        del(pred)
-        del(target)
-        return dice.sum()
+
+        return dice
 
 class iouloss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
 
     def forward(self, pred, target):
-        if len(self.w) != self.outchannels:
-            raise ValueError("Loss weights should be equal to the output channels.")
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
@@ -72,39 +56,33 @@ class iouloss(torch.nn.Module):
         B_sum = target[mask].sum(dim=0)
         union = A_sum + B_sum - intersection
         iou =  1 - ((intersection + self.smooth) / (union + self.smooth))
-        iou = iou * self.w.to(device=iou.device)
+
         return iou.sum()
 
 class celoss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
 
     def forward(self, pred, target):
-        if len(self.w) != self.outchannels:
-            raise ValueError("Loss weights should be equal to the output channels.")
             
         pred = self.act(pred)
-        ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=pred.device))(pred, torch.argmax(target, dim=1).long())
+        ce = torch.nn.CrossEntropyLoss()(pred, torch.argmax(target, dim=1).long())
         return ce
 
 class nllloss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
 
     def forward(self, pred, target):
-        if len(self.w) != self.outchannels:
-            raise ValueError("Loss weights should be equal to the output channels.")
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
@@ -116,7 +94,7 @@ class nllloss(torch.nn.Module):
         return nll
 
 class focalloss(torch.nn.modules.loss._WeightedLoss):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False, gamma=2):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False, gamma=2):
         super().__init__()
 
     def forward(self, pred, target):
@@ -125,18 +103,15 @@ class focalloss(torch.nn.modules.loss._WeightedLoss):
 
 
 class customloss(torch.nn.modules.loss._WeightedLoss):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, w=[1.0], outchannels=1, label_smoothing=0, masked = False, gamma=2):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False, gamma=2):
         super().__init__()
         self.act = act
         self.smooth = smooth
-        self.w = torch.tensor(w)
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
 
     def forward(self, pred, target):
-        if len(self.w) != self.outchannels:
-            raise ValueError("Loss weights should be equal to the output channels.")
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
@@ -146,7 +121,9 @@ class customloss(torch.nn.modules.loss._WeightedLoss):
         ce = torch.nn.CrossEntropyLoss(weight=self.w.to(device=_pred.device))(_pred, torch.argmax(target, dim=1).long())
         pred = self.act(pred).permute(0,2,3,1)
         target = target.permute(0,2,3,1)
-        dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
-        dice = dice * self.w.to(device=dice.device)
 
-        return 0.75 * dice.sum() + 0.25 * ce
+        intersection = (pred * target)[mask].sum(dim=0)
+        union = pred[mask].sum(dim=0) + target[mask].sum(dim=0) - intersection
+        iou =  1 - ((intersection + self.smooth) / (union + self.smooth))
+
+        return iou.sum() + ce

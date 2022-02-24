@@ -28,9 +28,10 @@ if __name__ == "__main__":
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)            
     frame = Framework(
         loss_fn = loss_fn,
-        model_opts=conf.model_opts,
-        optimizer_opts=conf.optim_opts,
-        reg_opts=conf.reg_opts
+        model_opts = conf.model_opts,
+        optimizer_opts = conf.optim_opts,
+        reg_opts = conf.reg_opts,
+        loss_opts = conf.loss_opts
     )
 
     if conf.fine_tune:
@@ -58,9 +59,17 @@ if __name__ == "__main__":
     fn.print_conf(conf)
     fn.log(logging.INFO, "# Training Instances = {}, # Validation Instances = {}".format(len(train_loader), len(val_loader)))
 
+    _normalize = np.load(data_dir / "normalize_train.npy")
+    if conf.normalize == "min-max":
+        _normalize = (_normalize[2][conf.use_channels], _normalize[3][conf.use_channels])
+    elif conf.normalize == "mean-std":
+        _normalize = (_normalize[0][conf.use_channels], _normalize[1][conf.use_channels])
+    else:
+        raise ValueError("Normalize must be min-max or mean-std")
+
     for epoch in range(1, conf.epochs+1):
         # train loop
-        loss_train, train_metric = fn.train_epoch(epoch, train_loader, frame, conf)
+        loss_train, train_metric, loss_weights = fn.train_epoch(epoch, train_loader, frame, conf)
         fn.log_metrics(writer, train_metric, epoch, "train", conf.log_opts.mask_names)
 
         # validation loop
@@ -68,8 +77,8 @@ if __name__ == "__main__":
         fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
 
         if (epoch-1) % 5 == 0:
-            fn.log_images(writer, frame, train_loader, epoch, "train", conf.threshold)
-            fn.log_images(writer, frame, val_loader, epoch, "val", conf.threshold)
+            fn.log_images(writer, frame, train_loader, epoch, "train", conf.threshold, conf.normalize, _normalize)
+            fn.log_images(writer, frame, val_loader, epoch, "val", conf.threshold, conf.normalize, _normalize)
 
         # Save best model
         if new_loss_val < loss_val:
@@ -78,13 +87,10 @@ if __name__ == "__main__":
         
         lr = fn.get_current_lr(frame)
         writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
+        writer.add_scalars("Loss/Weight", {"background": loss_weights[0], "clean ice": loss_weights[1], "debris": loss_weights[2]}, epoch)
         writer.add_scalar("lr", lr, epoch)
 
         fn.print_metrics(conf, train_metric, val_metric)
-        del(train_metric)
-        del(loss_train)
-        del(new_loss_val)
-        del(lr)
         torch.cuda.empty_cache()
         writer.flush()
         gc.collect()

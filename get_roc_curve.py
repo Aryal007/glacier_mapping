@@ -18,12 +18,19 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score
 
 warnings.filterwarnings("ignore")
 
-def min_max_normalize(X):
-    _min = np.asarray([0,0,0,0,0,0,0,0,0,0,-1,-1,-1])
-    _max = np.asarray([255,255,255,255,255,255, 255, 255,
-                                8000, 85, 1, 1, 1])
+def min_max_normalize(conf, X):
+    data_dir = pathlib.Path(conf.data_dir)
+    _min = np.load(data_dir / "normalize_train.npy")[2][conf.use_channels]
+    _max = np.load(data_dir / "normalize_train.npy")[3][conf.use_channels]
     X = np.clip(X, _min, _max)
     X = (X - _min) / (_max - _min)
+    return X
+
+def mean_std_normalize(conf, X):
+    data_dir = pathlib.Path(conf.data_dir)
+    _mean = np.load(data_dir / "normalize_train.npy")[0][conf.use_channels]
+    _std = np.load(data_dir / "normalize_train.npy")[1][conf.use_channels]
+    X = (X - _mean) / _std
     return X
 
 def plot_iou_curve(y, scores, glacier_type):
@@ -77,7 +84,8 @@ if __name__ == "__main__":
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels)            
     frame = Framework(
         loss_fn = loss_fn,
-        model_opts=conf.model_opts
+        model_opts=conf.model_opts,
+        loss_opts = conf.loss_opts
     )
 
     model_path = f"{conf.data_dir}/runs/{conf.run_name}/models/model_final.pt"
@@ -94,9 +102,14 @@ if __name__ == "__main__":
         mask_arr = np.zeros((len(val_files), _arr.shape[0], _arr.shape[1]))
         pred_arr, gt_arr = np.zeros_like(mask_arr), np.zeros_like(mask_arr)
         for i, f in enumerate(val_files):
-            X = np.load(val_dir / f)
+            X = np.load(val_dir / f)[:,:,conf.use_channels]
             mask_arr[i] = np.sum(X[:,:,:5], axis=2) != 0
-            X = min_max_normalize(X)
+            if conf.normalize == "min-max":
+                X = min_max_normalize(conf, X)
+            elif conf.normalize == "mean-std":
+                X = mean_std_normalize(conf, X)
+            else:
+                raise ValueError("Normalize must be min-max or mean-std")
             X = torch.Tensor(np.expand_dims(X, 0))
             y_pred = frame.act(frame.infer(X))
             y_gt = (np.load(val_dir / f.replace("tiff", "mask")) == glacier_index).astype(np.int8)
