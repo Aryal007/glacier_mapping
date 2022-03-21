@@ -9,15 +9,18 @@ metrics
 """
 import torch, pdb
 from torchvision.ops import sigmoid_focal_loss
+import numpy as np
+from skimage.filters import gaussian
 
 class diceloss(torch.nn.Module):
-    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False):
+    def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked = False, gaussian_blur_sigma = None):
         super().__init__()
         self.act = act
         self.smooth = smooth
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
+        self.gaussian_blur_sigma = gaussian_blur_sigma
 
     def forward(self, pred, target):
         if self.masked:
@@ -25,10 +28,17 @@ class diceloss(torch.nn.Module):
         else:
             mask = torch.ones((target.size()[0], target.size()[2], target.size()[3]), dtype=torch.bool)
 
-        target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
+        if self.gaussian_blur_sigma != 'None':
+            _target = np.zeros_like(target.cpu())
+            for i in range(target.shape[0]):
+                for j in range(target.shape[1]):
+                    _target[i, j, :, :] = gaussian(target[i, j, :, :].cpu(), self.gaussian_blur_sigma)
+            target = torch.from_numpy(_target).to(mask.device)
 
+        target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
         pred = self.act(pred).permute(0,2,3,1)
         target = target.permute(0,2,3,1)
+        
         dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
 
         return dice

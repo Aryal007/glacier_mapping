@@ -164,7 +164,7 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
             labelled_pixels = np.sum(np.sum(slice[:,:,:5], axis=2) != 0)
             percentage = 0.5
         else:
-            labelled_pixels = np.sum(slice == 2)
+            labelled_pixels = np.sum(slice != 0)
         total_pixels = slice.shape[0] * slice.shape[1]
         if labelled_pixels/total_pixels < percentage:
             return False

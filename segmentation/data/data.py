@@ -25,7 +25,7 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=Fa
     """
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
                                     transforms = transforms.Compose([
-                                               DropoutChannels(0.5),
+                                               #DropoutChannels(0.5),
                                                FlipHorizontal(0.5),
                                                FlipVertical(0.5),
                                                Rot270(0.5),

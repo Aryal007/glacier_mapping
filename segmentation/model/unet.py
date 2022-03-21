@@ -25,6 +25,7 @@ class ConvBlock(nn.Module):
         self.outchannels = outchannels
         self.conv1 = nn.Conv2d(inchannels, outchannels, kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv2d(outchannels, outchannels, kernel_size=kernel_size, padding=padding)
+        self.conv_bn = nn.BatchNorm2d(outchannels)
         if dropout > 0:
             if spatial:
                 self.dropout = nn.Dropout2d(p=dropout)
@@ -32,9 +33,8 @@ class ConvBlock(nn.Module):
                 self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
-        x = F.gelu(self.conv1(x))
-        x = self.dropout(x)
-        x = F.gelu(self.conv2(x))
+        x = F.gelu(self.conv_bn(self.conv1(x)))
+        x = F.gelu(self.conv_bn(self.conv2(x)))
         x = self.dropout(x)
         return x
 

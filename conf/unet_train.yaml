@@ -1,35 +1,33 @@
-data_dir: "/data/baryal/HKH_new/processed_new"
+data_dir: "/data/baryal/HKH_new/processed"
 class_name: ["Clean Ice", "Debris Covered"]
-threshold: [0.16, 0.99]
+threshold: [0.67, 0.67]
 batch_size: 8
-gaussian_blur_sigma: 5
-run_name: "b_dynamic"
-epochs: 501
+run_name: "batchnorm"
+epochs: 151
 save_every: None
-use_channels: [0,1,2,3,4,5,6,7,8,9]
+use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 normalize: "mean-std"
 loss_opts:
   name: "dice"
   masked: True
-  weights: [2.0,2.0,2.0]
-  dynamic: True
+  weights: [1.0, 1.0, 1.0]
+  gaussian_blur_sigma: None
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 10
+    inchannels: 13
     outchannels: 3
-    net_depth: 3
+    net_depth: 4
     dropout: 0.2
     spatial: True
     first_channel_output: 64
 optim_opts:
   name: "Adam"
   args:
-    lr: 0.0001
+    lr: 0.001
 log_opts:
   mask_names: ["Background", "Clean Ice", "Debris Covered"]
 metrics_opts: ["IoU", "precision", "recall"]
-grad_accumulation_steps: None
 fine_tune: False
 reg_opts:
   l1_reg: 0.0001

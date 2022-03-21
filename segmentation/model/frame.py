@@ -40,20 +40,20 @@ class Framework:
         self.num_classes = model_opts.args.outchannels    
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
+        _optimizer_params = [{'params': self.model.parameters(), **optimizer_opts["args"]}]
+        if loss_opts is None:
+            self.loss_weights =  torch.tensor([1.0, 1.0, 1.0]).to(self.device)
+        else:
+            self.loss_weights = torch.tensor(loss_opts.weights).to(self.device)
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
-        #self.optimizer = optimizer_def(self.model.parameters(), **optimizer_opts["args"])
-        self.loss_weights = torch.tensor(loss_opts.weights).to(self.device)
-        if loss_opts.dynamic:
-            self.loss_weights = self.loss_weights.requires_grad_()
-        self.optimizer = optimizer_def([{'params': self.model.parameters(), **optimizer_opts["args"]},
-                                        {'params': self.loss_weights, **optimizer_opts["args"]}])
+        self.optimizer = optimizer_def(_optimizer_params)
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose = True, 
                                              patience = 4,
                                              factor = 0.1,
                                              min_lr = 1e-9)
         self.lrscheduler2 = CyclicLR(self.optimizer, 
-                                    base_lr=optimizer_opts["args"]["lr"]*0.1, 
+                                    base_lr=optimizer_opts["args"]["lr"]*0.01, 
                                     max_lr=optimizer_opts["args"]["lr"], 
                                     mode = 'triangular2', step_size_up = 20,
                                     verbose=True, cycle_momentum=False)
@@ -72,9 +72,7 @@ class Framework:
         """
         x = x.permute(0, 3, 1, 2).to(self.device)
         y = y.permute(0, 3, 1, 2).to(self.device)
-
         y_hat = self.model(x)
-        
         loss = self.calc_loss(y_hat, y)
         loss.backward()
         return y_hat.permute(0, 2, 3, 1), loss
@@ -116,8 +114,9 @@ class Framework:
             Prediction
 
         """
+        x = x.permute(0, 3, 1, 2).to(self.device)
         with torch.no_grad():
-            y = self.model(x.permute(0, 3, 1, 2).to(self.device))
+            y = self.model(x)
         return y.permute(0, 2, 3, 1)
 
     def calc_loss(self, y_hat, y):
@@ -233,10 +232,14 @@ class Framework:
         model_path = Path(out_dir, f"model_best.h5")
         torch.save(self.model.state_dict(), model_path)
 
-    def freeze_layers(self):
+    def freeze_layers(self, layers=None):
         for i, layer in enumerate(self.model.parameters()):
-            if i < 60: # Freeze 60 out of 75 layers, retrain on last 15 only
+            if layers is None:
                 layer.requires_grad = False
+            elif i < layers: # Freeze 60 out of 75 layers, retrain on last 15 only
+                layer.requires_grad = False
+            else:
+                pass
 
     def find_lr(self, train_loader, init_value, final_value):
         number_in_epoch = len(train_loader) - 1

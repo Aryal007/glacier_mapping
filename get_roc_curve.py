@@ -88,7 +88,7 @@ if __name__ == "__main__":
         loss_opts = conf.loss_opts
     )
 
-    model_path = f"{conf.data_dir}/runs/{conf.run_name}/models/model_final.pt"
+    model_path = f"{conf.data_dir}/runs/{conf.run_name}/models/model_best.pt"
     if torch.cuda.is_available():
         state_dict = torch.load(model_path)
     else:

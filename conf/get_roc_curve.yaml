@@ -1,21 +1,21 @@
-data_dir: "/data/baryal/HKH_new/processed_new"
-run_name: "b_temp"
+data_dir: "/data/baryal/HKH_new/processed"
+run_name: "batchnorm"
 normalize: "mean-std"
 class_name: 
   clean_ice: 1
   debris: 2
 batch_size: 64
-use_channels: [0,1,2,3,4,5,6,7,8,9]
+use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
 loss_opts:
   name: "ce"
   masked: True
-  weights: [0.1, 0.5, 1.5]
+  weights: [1,1,1]
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 10
+    inchannels: 13
     outchannels: 3
-    net_depth: 3
+    net_depth: 4
     dropout: 0.2
     spatial: True
     first_channel_output: 64

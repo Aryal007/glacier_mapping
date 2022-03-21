@@ -56,17 +56,9 @@ def train_epoch(epoch, loader, frame, conf):
     loss, batch_loss, tp, fp, fn = 0, 0, torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
     train_iterator = tqdm(loader, desc="Train Iter (Epoch=X Steps=X loss=X.XXX lr=X.XXXXXXX)")
     for i, (x,y) in enumerate(train_iterator):
-        if grad_accumulation_steps != "None":
-            if (i+1) % grad_accumulation_steps == 0:
-                frame.zero_grad()
-        else:
-            frame.zero_grad()
+        frame.zero_grad()
         y_hat, batch_loss = frame.optimize(x, y)
-        if grad_accumulation_steps != "None":
-            if (i+1) % grad_accumulation_steps == 0:
-                frame.step()
-        else:
-            frame.step()
+        frame.step()
         batch_loss = float(batch_loss.detach())
         loss += batch_loss
         y_hat = frame.act(y_hat)
@@ -77,8 +69,8 @@ def train_epoch(epoch, loader, frame, conf):
         fn += _fn 
         train_iterator.set_description("Train, Epoch=%d Steps=%d Loss=%5.3f Avg_Loss=%5.3f " %(epoch, i, batch_loss, loss/(i+1)))
     metrics = get_metrics(tp, fp, fn, metrics_opts)
-    loss_weights = frame.get_loss_weights().detach().numpy()
-    
+    loss_weights = frame.get_loss_weights()
+
     return loss / (i+1), metrics, loss_weights
 
 
@@ -206,8 +198,9 @@ def get_loss(outchannels, opts=None):
         label_smoothing = 0
     else:
         label_smoothing = opts.label_smoothing
+
     if opts.name == "dice":
-        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, label_smoothing=label_smoothing, masked=opts.masked)
+        loss_fn = diceloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, label_smoothing=label_smoothing, masked=opts.masked, gaussian_blur_sigma=opts.gaussian_blur_sigma)
     elif opts.name == "iou":
         loss_fn = iouloss(act=torch.nn.Softmax(dim=1), outchannels=outchannels, masked = opts.masked)
     elif opts.name == "ce":

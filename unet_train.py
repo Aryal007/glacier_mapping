@@ -88,6 +88,7 @@ if __name__ == "__main__":
         lr = fn.get_current_lr(frame)
         writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
         writer.add_scalars("Loss/Weight", {"background": loss_weights[0], "clean ice": loss_weights[1], "debris": loss_weights[2]}, epoch)
+
         writer.add_scalar("lr", lr, epoch)
 
         fn.print_metrics(conf, train_metric, val_metric)
