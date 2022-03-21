@@ -8,12 +8,14 @@ Created on Fri Sep  4 23:09:33 2020
 metrics and regularizations
 """
 import numpy as np
-import torch, pdb
+import torch
+import pdb
+
 
 def precision(tp, fp, fn):
     try:
         return tp / (tp + fp)
-    except:
+    except BaseException:
         return 0
 
 
@@ -28,21 +30,21 @@ def tp_fp_fn(pred, true, label=1):
 def recall(tp, fp, fn):
     try:
         return tp / (tp + fn)
-    except:
+    except BaseException:
         return 0
 
 
 def dice(tp, fp, fn):
     try:
         return (2 * tp) / (2 * tp + fp + fn)
-    except:
+    except BaseException:
         return 0
 
 
 def IoU(tp, fp, fn):
     try:
         return tp / (tp + fp + fn)
-    except:
+    except BaseException:
         return 0
 
 

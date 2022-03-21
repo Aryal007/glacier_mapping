@@ -1,5 +1,0 @@
-data_dir: "/mnt/datadrive/noaa/processed/"
-out_dir: "/mnt/datadrive/noaa/ml_data/"
-per_class_pixels_per_slice: 5000
-data: ["train", "val"]
-save_every_files: 500

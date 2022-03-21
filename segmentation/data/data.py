@@ -6,16 +6,27 @@ Created on Wed Feb 17 13:24:56 2021
 @author: mibook
 """
 import glob
-import os, pdb, gc
+import os
+import pdb
+import gc
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import torch
 import elasticdeform
 from torchvision import transforms
 
-def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False,
-                  train_folder='train', val_folder='val', test_folder='',
-                  shuffle=True):
+
+def fetch_loaders(
+        processed_dir,
+        batch_size=32,
+        use_channels=[
+            0,
+            1],
+    normalize=False,
+    train_folder='train',
+    val_folder='val',
+    test_folder='',
+        shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
     Args:
         processed_dir(str): Directory with the processed data
@@ -24,21 +35,26 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=Fa
         Returns train and val dataloaders
     """
     train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
-                                    transforms = transforms.Compose([
-                                               #DropoutChannels(0.5),
-                                               FlipHorizontal(0.5),
-                                               FlipVertical(0.5),
-                                               Rot270(0.5),
-                                               Cut(0.5)
-                                           ])
-                                    )
-    val_dataset = CoastalDataset(processed_dir / val_folder, use_channels, normalize)
+                                   transforms=transforms.Compose([
+                                       # DropoutChannels(0.5),
+                                       FlipHorizontal(0.5),
+                                       FlipVertical(0.5),
+                                       Rot270(0.5),
+                                       Cut(0.5)
+                                   ])
+                                   )
+    val_dataset = CoastalDataset(
+        processed_dir /
+        val_folder,
+        use_channels,
+        normalize)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size,
-                        num_workers=2, shuffle=shuffle)
+                              num_workers=2, shuffle=shuffle)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                        num_workers=2, shuffle=shuffle)
+                            num_workers=2, shuffle=shuffle)
     return train_loader, val_loader
+
 
 class CoastalDataset(Dataset):
     """Custom Dataset for Coastal Data
@@ -64,7 +80,6 @@ class CoastalDataset(Dataset):
             self.mean, self.std = arr[0][use_channels], arr[1][use_channels]
 
     def __getitem__(self, index):
-
         """ getitem method to retrieve a single instance of the dataset
         Args:
             index(int): Index identifier of the data instance
@@ -72,7 +87,7 @@ class CoastalDataset(Dataset):
             data(x) and corresponding label(y)
         """
         data = np.load(self.img_files[index])
-        data = data[:,:,self.use_channels]  
+        data = data[:, :, self.use_channels]
         _mask = np.sum(data[:, :, :7], axis=2) == 0
         if self.normalize == "min-max":
             data = np.clip(data, self.min, self.max)
@@ -84,7 +99,7 @@ class CoastalDataset(Dataset):
         label = np.expand_dims(np.load(self.mask_files[index]), axis=2)
         ones = label == 1
         twos = label == 2
-        zeros = np.invert(ones+twos)
+        zeros = np.invert(ones + twos)
         label = np.concatenate((zeros, ones, twos), axis=2)
         label[_mask] = 0
         if self.transforms:
@@ -108,12 +123,14 @@ class CoastalDataset(Dataset):
         """
         return len(self.img_files)
 
+
 class FlipHorizontal(object):
     """Flip horizontal randomly the image in a sample.
 
     Args:
         p (float between 0 and 1): Probability of FlipHorizontal
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -126,12 +143,14 @@ class FlipHorizontal(object):
             label = label[:, ::-1, :]
         return {'image': data, 'mask': label}
 
+
 class FlipVertical(object):
     """Flip vertically randomly the image in a sample.
 
     Args:
         p (float between 0 and 1): Probability of FlipVertical
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -144,12 +163,14 @@ class FlipVertical(object):
             label = label[::-1, :, :]
         return {'image': data, 'mask': label}
 
+
 class Rot270(object):
     """Flip vertically randomly the image in a sample.
 
     Args:
         p (float between 0 and 1): Probability of Rot270
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -158,9 +179,10 @@ class Rot270(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            data = data.transpose((1,0,2))
-            label = label.transpose((1,0,2))
+            data = data.transpose((1, 0, 2))
+            label = label.transpose((1, 0, 2))
         return {'image': data, 'mask': label}
+
 
 class Cut(object):
     """Cut randomly the first 7 channels of image in a sample.
@@ -168,6 +190,7 @@ class Cut(object):
     Args:
         p (float between 0 and 1): Probability of FlipHorizontal
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -192,9 +215,11 @@ class Cut(object):
                 label[256:, 256:, :] = 0
         return {'image': data, 'mask': label}
 
+
 class ElasticDeform(object):
     """Apply Elasticdeform from U-Net
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -203,12 +228,15 @@ class ElasticDeform(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            [data, label] = elasticdeform.deform_random_grid([data, label], axis=(0, 1))
+            [data, label] = elasticdeform.deform_random_grid(
+                [data, label], axis=(0, 1))
         return {'image': data, 'mask': label}
+
 
 class DropoutChannels(object):
     """Apply Random channel dropouts
     """
+
     def __init__(self, p):
         if (p > 1) or (p < 0):
             raise Exception("Probability should be between 0 and 1")
@@ -217,6 +245,6 @@ class DropoutChannels(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            rand_channel_index = np.random.randint(low = 0, high = data.shape[2])
+            rand_channel_index = np.random.randint(low=0, high=data.shape[2])
             data[:, :, rand_channel_index] = 0
         return {'image': data, 'mask': label}

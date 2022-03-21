@@ -14,10 +14,14 @@ from .unet import *
 from .metrics import *
 
 import numpy as np
-import os, pdb, torch, math
+import os
+import pdb
+import torch
+import math
 from tqdm import tqdm
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
+
 
 class Framework:
     """
@@ -31,32 +35,37 @@ class Framework:
         Set Class Attrributes
         """
         if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = device
         if optimizer_opts is None:
             optimizer_opts = {"name": "Adam", "args": {"lr": 0.001}}
         self.multi_class = True if model_opts.args.outchannels > 1 else False
-        self.num_classes = model_opts.args.outchannels    
+        self.num_classes = model_opts.args.outchannels
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
-        _optimizer_params = [{'params': self.model.parameters(), **optimizer_opts["args"]}]
+        _optimizer_params = [
+            {'params': self.model.parameters(), **optimizer_opts["args"]}]
         if loss_opts is None:
-            self.loss_weights =  torch.tensor([1.0, 1.0, 1.0]).to(self.device)
+            self.loss_weights = torch.tensor([1.0, 1.0, 1.0]).to(self.device)
         else:
             self.loss_weights = torch.tensor(loss_opts.weights).to(self.device)
         optimizer_def = getattr(torch.optim, optimizer_opts["name"])
         self.optimizer = optimizer_def(_optimizer_params)
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
-                                             verbose = True, 
-                                             patience = 4,
-                                             factor = 0.1,
-                                             min_lr = 1e-9)
-        self.lrscheduler2 = CyclicLR(self.optimizer, 
-                                    base_lr=optimizer_opts["args"]["lr"]*0.01, 
-                                    max_lr=optimizer_opts["args"]["lr"], 
-                                    mode = 'triangular2', step_size_up = 20,
-                                    verbose=True, cycle_momentum=False)
+                                             verbose=True,
+                                             patience=4,
+                                             factor=0.1,
+                                             min_lr=1e-9)
+        self.lrscheduler2 = CyclicLR(
+            self.optimizer,
+            base_lr=optimizer_opts["args"]["lr"] * 0.01,
+            max_lr=optimizer_opts["args"]["lr"],
+            mode='triangular2',
+            step_size_up=20,
+            verbose=True,
+            cycle_momentum=False)
         #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
@@ -76,7 +85,7 @@ class Framework:
         loss = self.calc_loss(y_hat, y)
         loss.backward()
         return y_hat.permute(0, 2, 3, 1), loss
-    
+
     def zero_grad(self):
         self.optimizer.zero_grad()
 
@@ -92,7 +101,7 @@ class Framework:
         Update the LR Scheduler
         """
         self.lrscheduler2.step()
-        #self.lrscheduler.step(val_loss)
+        # self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
         """
@@ -133,7 +142,7 @@ class Framework:
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
         loss = self.loss_fn(y_hat, y)
-        loss = loss*self.loss_weights
+        loss = loss * self.loss_weights
         loss = loss.sum()
         if self.reg_opts:
             for reg_type in self.reg_opts.keys():
@@ -164,25 +173,26 @@ class Framework:
         _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2]))
         y_hat = y_hat.detach().cpu().numpy()
         for i in range(1, n_classes):
-            _y_hat[y_hat[:,:,:,i] >= threshold[i-1]] = i+1
+            _y_hat[y_hat[:, :, :, i] >= threshold[i - 1]] = i + 1
         _y_hat[_y_hat == 0] = 1
         _y_hat[mask] = 0
-        y_hat= _y_hat
+        y_hat = _y_hat
 
-        y = np.argmax(y.cpu().numpy(), axis=3)+1
+        y = np.argmax(y.cpu().numpy(), axis=3) + 1
         y[mask] = 0
-        
-        tp, fp, fn = torch.zeros(n_classes), torch.zeros(n_classes), torch.zeros(n_classes)
+
+        tp, fp, fn = torch.zeros(n_classes), torch.zeros(
+            n_classes), torch.zeros(n_classes)
         for i in range(0, n_classes):
-            _y_hat = (y_hat == i+1).astype(np.uint8)
-            _y = (y == i+1).astype(np.uint8)
+            _y_hat = (y_hat == i + 1).astype(np.uint8)
+            _y = (y == i + 1).astype(np.uint8)
             _tp, _fp, _fn = tp_fp_fn(_y_hat, _y)
             tp[i] = _tp
             fp[i] = _fp
             fn[i] = _fn
 
         return tp, fp, fn
-    
+
     def segment(self, y_hat):
         """Predict a class given logits
         Args:
@@ -192,12 +202,13 @@ class Framework:
             or one-hot tensor in case of multi class"""
         if self.multi_class:
             y_hat = torch.argmax(y_hat, axis=3)
-            y_hat = torch.nn.functional.one_hot(y_hat, num_classes=self.num_classes)
+            y_hat = torch.nn.functional.one_hot(
+                y_hat, num_classes=self.num_classes)
         else:
             y_hat = torch.sigmoid(y_hat)
-            
+
         return y_hat
-    
+
     def act(self, logits):
         """Applies activation function based on the model
         Args:
@@ -224,7 +235,7 @@ class Framework:
         else:
             state_dict = torch.load(model_path, map_location="cpu")
         self.load_state_dict(state_dict)
-    
+
     def save_best(self, out_dir):
         print(f"Current validation loss lower than previous, saving current state")
         if not os.path.exists(out_dir):
@@ -236,7 +247,7 @@ class Framework:
         for i, layer in enumerate(self.model.parameters()):
             if layers is None:
                 layer.requires_grad = False
-            elif i < layers: # Freeze 60 out of 75 layers, retrain on last 15 only
+            elif i < layers:  # Freeze 60 out of 75 layers, retrain on last 15 only
                 layer.requires_grad = False
             else:
                 pass
@@ -250,7 +261,9 @@ class Framework:
         batch_num = 0
         losses = []
         log_lrs = []
-        iterator = tqdm(train_loader, desc="Current lr=XX.XX Steps=XX Loss=XX.XX Best lr=XX.XX ")
+        iterator = tqdm(
+            train_loader,
+            desc="Current lr=XX.XX Steps=XX Loss=XX.XX Best lr=XX.XX ")
         for i, data in enumerate(iterator):
             batch_num += 1
             inputs, labels = data
@@ -269,7 +282,9 @@ class Framework:
             # Do the backward pass and optimize
             loss.backward()
             self.optimizer.step()
-            iterator.set_description("Current lr=%5.9f Steps=%d Loss=%5.3f Best lr=%5.9f " %(lr, i, loss, best_lr))
+            iterator.set_description(
+                "Current lr=%5.9f Steps=%d Loss=%5.3f Best lr=%5.9f " %
+                (lr, i, loss, best_lr))
             # Store the values
             losses.append(loss.detach())
             log_lrs.append(math.log10(lr))

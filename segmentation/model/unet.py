@@ -13,6 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ConvBlock(nn.Module):
     """
     Single Encoder Block
@@ -20,11 +21,27 @@ class ConvBlock(nn.Module):
     Transforms large image with small inchannels into smaller image with larger
     outchannels, via two convolution / relu pairs.
     """
-    def __init__(self, inchannels, outchannels, dropout, spatial, kernel_size=3, padding=1):
+
+    def __init__(
+            self,
+            inchannels,
+            outchannels,
+            dropout,
+            spatial,
+            kernel_size=3,
+            padding=1):
         super().__init__()
         self.outchannels = outchannels
-        self.conv1 = nn.Conv2d(inchannels, outchannels, kernel_size=kernel_size, padding=padding)
-        self.conv2 = nn.Conv2d(outchannels, outchannels, kernel_size=kernel_size, padding=padding)
+        self.conv1 = nn.Conv2d(
+            inchannels,
+            outchannels,
+            kernel_size=kernel_size,
+            padding=padding)
+        self.conv2 = nn.Conv2d(
+            outchannels,
+            outchannels,
+            kernel_size=kernel_size,
+            padding=padding)
         self.conv_bn = nn.BatchNorm2d(outchannels)
         if dropout > 0:
             if spatial:
@@ -46,7 +63,15 @@ class UpBlock(nn.Module):
     Transforms small image with large inchannels into larger image with smaller
     outchannels, via two convolution / relu pairs.
     """
-    def __init__(self, inchannels, outchannels, dropout, spatial, kernel_size=2, stride=2):
+
+    def __init__(
+            self,
+            inchannels,
+            outchannels,
+            dropout,
+            spatial,
+            kernel_size=2,
+            stride=2):
         super().__init__()
         self.upconv = nn.ConvTranspose2d(
             inchannels, outchannels, kernel_size=kernel_size, stride=stride
@@ -67,7 +92,15 @@ class Unet(nn.Module):
     Combines the encoder and decoder blocks with skip connections, to arrive at
     a U-Net model.
     """
-    def __init__(self, inchannels, outchannels, net_depth, dropout = 0.2, spatial = False, first_channel_output=16):
+
+    def __init__(
+            self,
+            inchannels,
+            outchannels,
+            net_depth,
+            dropout=0.2,
+            spatial=False,
+            first_channel_output=16):
         super().__init__()
         self.downblocks = nn.ModuleList()
         self.upblocks = nn.ModuleList()
@@ -80,7 +113,8 @@ class Unet(nn.Module):
             self.downblocks.append(conv)
             in_channels, out_channels = out_channels, 2 * out_channels
 
-        self.middle_conv = ConvBlock(in_channels, out_channels, dropout, spatial)
+        self.middle_conv = ConvBlock(
+            in_channels, out_channels, dropout, spatial)
 
         in_channels, out_channels = out_channels, int(out_channels / 2)
         for _ in range(net_depth):
@@ -88,7 +122,8 @@ class Unet(nn.Module):
             self.upblocks.append(upconv)
             in_channels, out_channels = out_channels, int(out_channels / 2)
 
-        self.seg_layer = nn.Conv2d(2 * out_channels, outchannels, kernel_size=1)
+        self.seg_layer = nn.Conv2d(
+            2 * out_channels, outchannels, kernel_size=1)
 
     def forward(self, x):
         decoder_outputs = []
