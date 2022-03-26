@@ -1,23 +1,21 @@
-data_dir: "/data/baryal/HKH_new"
-run_name: 'weighted'
-processed_dir: 'processed'
+data_dir: "/datadrive/HKH"
+folder_name: "runs"
+run_name: "1_rgb"
+processed_dir: "processed"
 window_size: [512, 512]
-threshold: [0.11, 0.99]
+threshold: [0.67, 0.67]
 model_opts:
-  args: 
-    inchannels: 13
+  args:
+    inchannels: 3
     outchannels: 3
-    net_depth: 3
-    dropout: 0.2
+    net_depth: 4
+    dropout: 0.00000001
     spatial: True
-    first_channel_output: 64
+    first_channel_output: 32
 optim_opts:
   name: "Adam"
   args:
     lr: 0.001
 reg_opts:
-  l1_reg: 0.0005
-add_ndvi: True
-add_ndwi: True
-add_ndsi: True
-use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
+  l1_reg: 0.0001
+use_channels: [0, 1, 2]

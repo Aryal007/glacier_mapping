@@ -34,7 +34,7 @@ def fetch_loaders(
     Return:
         Returns train and val dataloaders
     """
-    train_dataset = CoastalDataset(processed_dir / train_folder, use_channels, normalize,
+    train_dataset = GlacierDataset(processed_dir / train_folder, use_channels, normalize,
                                    transforms=transforms.Compose([
                                        # DropoutChannels(0.5),
                                        FlipHorizontal(0.5),
@@ -43,7 +43,7 @@ def fetch_loaders(
                                        Cut(0.5)
                                    ])
                                    )
-    val_dataset = CoastalDataset(
+    val_dataset = GlacierDataset(
         processed_dir /
         val_folder,
         use_channels,
@@ -56,8 +56,8 @@ def fetch_loaders(
     return train_loader, val_loader
 
 
-class CoastalDataset(Dataset):
-    """Custom Dataset for Coastal Data
+class GlacierDataset(Dataset):
+    """Custom Dataset for Glacier Data
     Indexing the i^th element returns the underlying image and the associated
     binary mask
     """

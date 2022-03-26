@@ -1,11 +1,11 @@
-data_dir: "/data/baryal/HKH_new/processed"
+data_dir: "/datadrive/HKH/processed"
 class_name: ["Clean Ice", "Debris Covered"]
 threshold: [0.67, 0.67]
 batch_size: 8
-run_name: "batchnorm"
-epochs: 151
+run_name: "1_rgb"
+epochs: 120
 save_every: None
-use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
+use_channels: [0, 1, 2]
 normalize: "mean-std"
 loss_opts:
   name: "dice"
@@ -14,13 +14,13 @@ loss_opts:
   gaussian_blur_sigma: None
   label_smoothing: 0.1
 model_opts:
-  args: 
-    inchannels: 13
+  args:
+    inchannels: 3
     outchannels: 3
     net_depth: 4
     dropout: 0.2
     spatial: True
-    first_channel_output: 64
+    first_channel_output: 32
 optim_opts:
   name: "Adam"
   args:

@@ -214,7 +214,7 @@ def save_slices(
     tiff_np = np.transpose(tiff.read(), (1, 2, 0))
     tiff_np = tiff_np[:, :, conf["use_bands"]]
     tiff_np[roi_mask] = 0
-    tiff_np = tiff_np.astype(np.float16)
+    tiff_np = tiff_np.astype(np.float32)
 
     if conf["add_ndvi"]:
         tiff_np = add_index(tiff_np, index1=3, index2=2)

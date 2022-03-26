@@ -36,13 +36,14 @@ saved_df = pd.DataFrame(
 train_df = df[df.split == "train"]
 val_ids = [
     '133041', '133040', '134040', '135040',
-    '138041', '147037', '149034', '150036',
+    '138041', '147037', '148035', '150036',
     '152034', '146038', '147036', '144039'
 ]
 val_filenames = sorted(
     list(set([x + '.tif' for x in train_df.image_id if x.split("_")[1] in val_ids])))
 train_filenames = sorted(list(
     set([x + '.tif' for x in train_df.image_id if x.split("_")[1] not in val_ids])))
+
 val_filenames = [Path(conf.image_dir) / x for x in val_filenames]
 train_filenames = [Path(conf.image_dir) / x for x in train_filenames]
 label_filename = Path(conf.labels_dir) / "train.shp"

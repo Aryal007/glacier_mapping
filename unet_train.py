@@ -13,16 +13,18 @@ import yaml
 import json
 import pathlib
 import warnings
-import pdb
-import torch
 import logging
-import time
 import gc
+import torch
+import random
+import pdb
 from torch.utils.tensorboard import SummaryWriter
 from addict import Dict
-import matplotlib.pyplot as plt
 import numpy as np
 
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
@@ -30,7 +32,6 @@ if __name__ == "__main__":
     data_dir = pathlib.Path(conf.data_dir)
     class_name = conf.class_name
     run_name = conf.run_name
-    #processed_dir = data_dir / "processed"
     processed_dir = data_dir
     train_loader, val_loader = fetch_loaders(
         processed_dir, conf.batch_size, conf.use_channels, conf.normalize, val_folder='val')

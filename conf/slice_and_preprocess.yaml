@@ -1,12 +1,26 @@
-image_dir: "/data/baryal/HKH_new/Landsat/"
-labels_dir: "/data/baryal/HKH_new/labels/"
-out_dir: "/data/baryal/HKH_new/processed_10_ci/"
-window_size: [512,512]
+image_dir: "/datadrive/HKH/Landsat7_2005/"
+labels_dir: "/datadrive/HKH/labels/"
+out_dir: "/datadrive/HKH/processed/"
+window_size: [512, 512]
 overlap: 32
 filter: 0.1
 add_ndvi: True
 add_ndwi: True
 add_ndsi: True
-add_hsv: False
-bands: ['B1','B2','B3','B4','B5','B6_VCID_1','B6_VCID_2','B7','elevation','slope']
-use_bands: [0,1,2,3,4,5,6,7,8,9]
+add_hsv: True
+bands:
+  [
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B6_VCID_1",
+    "B6_VCID_2",
+    "B7",
+    "elevation",
+    "slope",
+    "aspect",
+    "hillshade",
+  ]
+use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
