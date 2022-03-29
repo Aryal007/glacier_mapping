@@ -1,11 +1,12 @@
-data_dir: "/datadrive/HKH/processed"
+data_dir: "/data/baryal/HKH/processed_L07_2005"
+gpu_rank: 0
 class_name: ["Clean Ice", "Debris Covered"]
-threshold: [0.67, 0.67]
+threshold: [0.99, 0.99]
 batch_size: 8
-run_name: "1_rgb"
-epochs: 120
+run_name: "3_l07_se"
+epochs: 121
 save_every: None
-use_channels: [0, 1, 2]
+use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 normalize: "mean-std"
 loss_opts:
   name: "dice"
@@ -15,7 +16,7 @@ loss_opts:
   label_smoothing: 0.1
 model_opts:
   args:
-    inchannels: 3
+    inchannels: 10
     outchannels: 3
     net_depth: 4
     dropout: 0.2
@@ -31,5 +32,5 @@ metrics_opts: ["IoU", "precision", "recall"]
 fine_tune: False
 reg_opts:
   l1_reg: 0.0001
-comment: "IoU loss"
+comment: "Landsat 7 + slope + elevation"
 find_lr: False

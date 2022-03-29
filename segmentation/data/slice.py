@@ -203,7 +203,7 @@ def save_slices(
     def get_pixel_count(tiff_slice, mask_slice):
         mas = np.sum(tiff_slice[:, :, :5], axis=2) == 0
         mask_slice[mas] = 0
-        deb, ci = np.sum(mask_slice == 1), np.sum(mask_slice == 2)
+        deb, ci = np.sum(mask_slice == 2), np.sum(mask_slice == 1)
         mas = np.sum(mas)
         bg = mask_slice.shape[0] * mask_slice.shape[1] - (ci + deb + mas)
         return bg, ci, deb, mas
@@ -228,34 +228,19 @@ def save_slices(
         tiff_np = np.concatenate((tiff_np, hsv_img), axis=2)
 
     slicenum = 0
-    for row in range(
-            0,
-            tiff_np.shape[0],
-            conf["window_size"][0] -
-            conf["overlap"]):
-        for column in range(
-                0,
-                tiff_np.shape[0],
-                conf["window_size"][1] -
-                conf["overlap"]):
-            mask_slice = mask[row:row + conf["window_size"]
-                              [0], column:column + conf["window_size"][1]]
+    for row in range(0, tiff_np.shape[0], conf["window_size"][0] - conf["overlap"]):
+        for column in range( 0, tiff_np.shape[0], conf["window_size"][1] - conf["overlap"]):
+            mask_slice = mask[row:row + conf["window_size"] [0], column:column + conf["window_size"][1]]
             mask_slice = verify_slice_size(mask_slice, conf)
 
             if filter_percentage(mask_slice, conf["filter"]):
-                tiff_slice = tiff_np[row:row +
-                                     conf["window_size"][0], column:column +
-                                     conf["window_size"][1], :]
+                tiff_slice = tiff_np[row:row + conf["window_size"][0], column:column + conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
                 if filter_percentage(tiff_slice, conf["filter"], type="image"):
-                    mask_fname, tiff_fname = "mask_" + str(filenum) + "_slice_" + str(
-                        slicenum), "tiff_" + str(filenum) + "_slice_" + str(slicenum)
+                    mask_fname, tiff_fname = "mask_" + str(filenum) + "_slice_" + str( slicenum), "tiff_" + str(filenum) + "_slice_" + str(slicenum)
                     bg, ci, deb, mas = get_pixel_count(tiff_slice, mask_slice)
                     _tot = bg + ci + deb + mas
-                    _row = [filename, filenum, slicenum,
-                            bg, ci, deb, mas,
-                            bg / _tot, ci / _tot, deb / _tot, mas / _tot,
-                            os.path.basename(savepath)]
+                    _row = [filename, filenum, slicenum, bg, ci, deb, mas, bg / _tot, ci / _tot, deb / _tot, mas / _tot, os.path.basename(savepath)]
                     saved_df.loc[len(saved_df.index)] = _row
                     save_slice(mask_slice, savepath / mask_fname)
                     save_slice(tiff_slice, savepath / tiff_fname)
@@ -265,16 +250,7 @@ def save_slices(
     tiff_np = np.nan_to_num(tiff_np.astype(np.float64))
     if np.isnan(np.sum(np.std(tiff_np, axis=(0, 1)))):
         print("***********NaN Value encountered**************")
-    return np.mean(
-        tiff_np, axis=(
-            0, 1)), np.std(
-        tiff_np, axis=(
-            0, 1)), np.min(
-        tiff_np, axis=(
-            0, 1)), np.max(
-        tiff_np, axis=(
-            0, 1)), saved_df
-
+    return np.mean(tiff_np, axis=(0, 1)), np.std(tiff_np, axis=(0, 1)), np.min(tiff_np, axis=(0, 1)), np.max(tiff_np, axis=(0, 1)), saved_df
 
 def remove_and_create(dirpath):
     if os.path.exists(dirpath) and os.path.isdir(dirpath):

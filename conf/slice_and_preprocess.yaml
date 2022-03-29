@@ -1,13 +1,13 @@
-image_dir: "/datadrive/HKH/Landsat7_2005/"
-labels_dir: "/datadrive/HKH/labels/"
-out_dir: "/datadrive/HKH/processed/"
+image_dir: "/data/baryal/HKH/Landsat7_2005/"
+labels_dir: "/data/baryal/HKH/labels/"
+out_dir: "/data/baryal/HKH/processed_L07_2005/"
 window_size: [512, 512]
 overlap: 32
 filter: 0.1
 add_ndvi: True
 add_ndwi: True
 add_ndsi: True
-add_hsv: True
+add_hsv: False
 bands:
   [
     "B1",
@@ -23,4 +23,4 @@ bands:
     "aspect",
     "hillshade",
   ]
-use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]

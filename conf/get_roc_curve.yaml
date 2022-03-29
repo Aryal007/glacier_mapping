@@ -1,24 +1,25 @@
-data_dir: "/data/baryal/HKH_new/processed"
-run_name: "batchnorm"
+data_dir: "/data/baryal/HKH/processed_L07_2005"
+gpu_rank: 0
+run_name: "3_l07_se"
 normalize: "mean-std"
 class_name: 
   clean_ice: 1
   debris: 2
-batch_size: 64
-use_channels: [0,1,2,3,4,5,6,7,8,9,10,11,12]
+batch_size: 32
+use_channels: [0,1,2,3,4,5,6,7,8,9]
 loss_opts:
-  name: "ce"
+  name: "dice"
   masked: True
   weights: [1,1,1]
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 13
+    inchannels: 10
     outchannels: 3
     net_depth: 4
     dropout: 0.2
     spatial: True
-    first_channel_output: 64
+    first_channel_output: 32
 optim_opts:
   name: "Adam"
   args:

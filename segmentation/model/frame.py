@@ -34,11 +34,9 @@ class Framework:
         """
         Set Class Attrributes
         """
-        if device is None:
-            self.device = torch.device(
-                "cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if self.device.type == "cuda":
+            torch.cuda.set_device(device)
         if optimizer_opts is None:
             optimizer_opts = {"name": "Adam", "args": {"lr": 0.001}}
         self.multi_class = True if model_opts.args.outchannels > 1 else False

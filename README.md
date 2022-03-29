@@ -89,5 +89,5 @@ HKH
 └─── Landsat                          Location to store *.tif files
 └─── labels                           Location to store train and test shapefiles.
 └─── processed                        Location to store train, test, val directories, normalize array and slices metadata. Created during slice_and_preprocess
-│   └───runs                          Location to store U-Net training runs. Created during unet_train.py
+    └───runs                          Location to store U-Net training runs. Created during unet_train.py
 ```

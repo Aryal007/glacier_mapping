@@ -98,7 +98,8 @@ if __name__ == "__main__":
     frame = Framework(
         loss_fn=loss_fn,
         model_opts=conf.model_opts,
-        loss_opts=conf.loss_opts
+        loss_opts=conf.loss_opts,
+        device=conf.gpu_rank
     )
 
     model_path = f"{conf.data_dir}/runs/{conf.run_name}/models/model_best.pt"

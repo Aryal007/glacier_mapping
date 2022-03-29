@@ -21,7 +21,6 @@ import pdb
 from torch.utils.tensorboard import SummaryWriter
 from addict import Dict
 import numpy as np
-
 random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
@@ -41,7 +40,8 @@ if __name__ == "__main__":
         model_opts=conf.model_opts,
         optimizer_opts=conf.optim_opts,
         reg_opts=conf.reg_opts,
-        loss_opts=conf.loss_opts
+        loss_opts=conf.loss_opts,
+        device=int(conf.gpu_rank)
     )
 
     if conf.fine_tune:
@@ -66,6 +66,11 @@ if __name__ == "__main__":
     loss_val = np.inf
 
     fn.print_conf(conf)
+
+    with open(f"{data_dir}/runs/{run_name}/conf.json", 'w') as f:
+        j = json.dumps(conf, sort_keys=True)
+        f.write(j)
+    
     fn.log(
         logging.INFO,
         "# Training Instances = {}, # Validation Instances = {}".format(
@@ -131,11 +136,6 @@ if __name__ == "__main__":
         writer.add_scalars(
             "Loss", {
                 "train": loss_train, "val": new_loss_val}, epoch)
-        writer.add_scalars("Loss/Weight",
-                           {"background": loss_weights[0],
-                            "clean ice": loss_weights[1],
-                            "debris": loss_weights[2]},
-                           epoch)
 
         writer.add_scalar("lr", lr, epoch)
 
