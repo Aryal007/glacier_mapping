@@ -1,10 +1,10 @@
 data_dir: "/data/baryal/HKH"
 gpu_rank: 0
 folder_name: "runs"
-run_name: "3_l07_se"
+run_name: "1_rgb"
 processed_dir: "processed_L07_2005_all"
 window_size: [512, 512]
-threshold: [0.99, 0.78]
+threshold: [0.99, 0.99]
 model_opts:
   args:
     inchannels: 10

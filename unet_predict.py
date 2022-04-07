@@ -12,9 +12,12 @@ import pandas as pd
 from segmentation.model.metrics import *
 import segmentation.data.slice as sl
 
-def get_precision_recall_iou(pred, true):
+def get_tp_fp_fn(pred, true):
     pred, true = torch.from_numpy(pred), torch.from_numpy(true)
     tp, fp, fn = tp_fp_fn(pred, true)
+    return tp, fp, fn
+
+def get_precision_recall_iou(tp, fp, fn):
     p, r, i = precision(tp, fp, fn), recall(tp, fp, fn), IoU(tp, fp, fn)
     return p, r, i
 
@@ -22,7 +25,7 @@ if __name__ == "__main__":
     labels_dict = {"Clean Ice": 1, "Debris": 2}
     conf = Dict(yaml.safe_load(open('./conf/unet_predict.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
-    preds_dir = data_dir / conf.processed_dir / "preds"
+    preds_dir = data_dir / conf.processed_dir / "preds" / conf.run_name
     columns = ["tile_name", "ci_precision", "ci_recall", "ci_IoU", "debris_precision", "debris_recall", "debris_IoU"]
     df = pd.DataFrame(columns=columns)
     sl.remove_and_create(preds_dir)
@@ -50,6 +53,9 @@ if __name__ == "__main__":
     files = os.listdir(data_dir / conf.processed_dir / "test")
     inputs = [x for x in files if "tiff" in x]
 
+    ci_tp_sum, ci_fp_sum, ci_fn_sum = 0, 0, 0
+    debris_tp_sum, debris_fp_sum, debris_fn_sum = 0, 0, 0
+
     for x_fname in inputs:
         x = np.load(data_dir / conf.processed_dir / "test" / x_fname)[:,:,conf.use_channels]
         mask = np.sum(x[:,:,:5], axis=2) == 0
@@ -76,10 +82,23 @@ if __name__ == "__main__":
         y_pred = _pred
         ci_pred, debris_pred = y_pred == 2, y_pred == 3
         ci_true, debris_true = y_true == 2, y_true == 3
-        ci_precision, ci_recall, ci_iou = get_precision_recall_iou(ci_pred, ci_true)
-        debris_precision, debris_recall, debris_iou = get_precision_recall_iou(debris_pred, debris_true)
+        ci_tp, ci_fp, ci_fn = get_tp_fp_fn(ci_pred, ci_true)
+        debris_tp, debris_fp, debris_fn = get_tp_fp_fn(debris_pred, debris_true)
+        ci_precision, ci_recall, ci_iou = get_precision_recall_iou(ci_tp, ci_fp, ci_fn)
+        debris_precision, debris_recall, debris_iou = get_precision_recall_iou(debris_tp, debris_fp, debris_fn)
         _row = [save_fname, ci_precision, ci_recall, ci_iou, debris_precision, debris_recall, debris_iou]
         df = df.append(pd.DataFrame([_row], columns=columns), ignore_index=True)
         np.save(preds_dir / save_fname, pred.numpy())
+        ci_tp_sum += ci_tp
+        ci_fp_sum += ci_fp
+        ci_fn_sum += ci_fn
+        debris_tp_sum += debris_tp
+        debris_fp_sum += debris_fp
+        debris_fn_sum += debris_fn
 
+    ci_precision, ci_recall, ci_iou = get_precision_recall_iou(ci_tp_sum, ci_fp_sum, ci_fn_sum)
+    debris_precision, debris_recall, debris_iou = get_precision_recall_iou(debris_tp_sum, debris_fp_sum, debris_fn_sum)
+    _row = ["Total", ci_precision, ci_recall, ci_iou, debris_precision, debris_recall, debris_iou]
+    df = df.append(pd.DataFrame([_row], columns=columns), ignore_index=True)
+    print(f"{dict(zip(columns, _row))}")
     df.to_csv(preds_dir / "metadata.csv")

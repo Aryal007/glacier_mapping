@@ -11,22 +11,13 @@ import pdb
 import gc
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+import random
 import torch
 import elasticdeform
 from torchvision import transforms
 
 
-def fetch_loaders(
-        processed_dir,
-        batch_size=32,
-        use_channels=[
-            0,
-            1],
-    normalize=False,
-    train_folder='train',
-    val_folder='val',
-    test_folder='',
-        shuffle=True):
+def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False, train_folder='train', val_folder='val', test_folder='', shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
     Args:
         processed_dir(str): Directory with the processed data
@@ -36,22 +27,28 @@ def fetch_loaders(
     """
     train_dataset = GlacierDataset(processed_dir / train_folder, use_channels, normalize,
                                    transforms=transforms.Compose([
-                                       # DropoutChannels(0.5),
+                                       #DropoutChannels(0.5),
                                        FlipHorizontal(0.5),
                                        FlipVertical(0.5),
                                        Rot270(0.5),
                                        Cut(0.5)
                                    ])
                                    )
-    val_dataset = GlacierDataset(
-        processed_dir /
-        val_folder,
-        use_channels,
-        normalize)
+    val_dataset = GlacierDataset(processed_dir / val_folder, use_channels, normalize)
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size,
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
+    g = torch.Generator()
+    g.manual_seed(42)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, 
+                              worker_init_fn=seed_worker, generator=g,
                               num_workers=2, shuffle=shuffle)
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
+                            worker_init_fn=seed_worker, generator=g,
                             num_workers=2, shuffle=shuffle)
     return train_loader, val_loader
 
@@ -215,24 +212,6 @@ class Cut(object):
                 label[256:, 256:, :] = 0
         return {'image': data, 'mask': label}
 
-
-class ElasticDeform(object):
-    """Apply Elasticdeform from U-Net
-    """
-
-    def __init__(self, p):
-        if (p > 1) or (p < 0):
-            raise Exception("Probability should be between 0 and 1")
-        self.p = p
-
-    def __call__(self, sample):
-        data, label = sample['image'], sample['mask']
-        if torch.rand(1) < self.p:
-            [data, label] = elasticdeform.deform_random_grid(
-                [data, label], axis=(0, 1))
-        return {'image': data, 'mask': label}
-
-
 class DropoutChannels(object):
     """Apply Random channel dropouts
     """
@@ -245,6 +224,6 @@ class DropoutChannels(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            rand_channel_index = np.random.randint(low=0, high=data.shape[2])
+            rand_channel_index = np.random.randint(low=0, high=data.shape[2], size=3)
             data[:, :, rand_channel_index] = 0
         return {'image': data, 'mask': label}

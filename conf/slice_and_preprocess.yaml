@@ -1,6 +1,6 @@
-image_dir: "/data/baryal/HKH/Landsat7_2005/"
+image_dir: "/data/baryal/HKH/Landsat7_2015/"
 labels_dir: "/data/baryal/HKH/labels/"
-out_dir: "/data/baryal/HKH/processed_L07_2005/"
+out_dir: "/data/baryal/HKH/processed_L07_2015/"
 window_size: [512, 512]
 overlap: 32
 filter: 0.1

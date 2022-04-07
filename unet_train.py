@@ -65,7 +65,7 @@ if __name__ == "__main__":
     out_dir = f"{data_dir}/runs/{run_name}/models/"
     loss_val = np.inf
 
-    fn.print_conf(conf)
+    #fn.print_conf(conf)
 
     with open(f"{data_dir}/runs/{run_name}/conf.json", 'w') as f:
         j = json.dumps(conf, sort_keys=True)
