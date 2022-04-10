@@ -1,12 +1,12 @@
-data_dir: "/data/baryal/HKH/processed_L07_2005"
+data_dir: "/data/baryal/HKH/processed_L08_2015"
 gpu_rank: 0
-run_name: "3_l07_se"
+run_name: "2_l08"
 normalize: "mean-std"
 class_name: 
   clean_ice: 1
   debris: 2
 batch_size: 32
-use_channels: [0,1,2,3,4,5,6,7,8,9]
+use_channels: [0,1,2,3,4,5,6,7,8,9,10]
 loss_opts:
   name: "dice"
   masked: True
@@ -14,7 +14,7 @@ loss_opts:
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 10
+    inchannels: 11
     outchannels: 3
     net_depth: 4
     dropout: 0.2

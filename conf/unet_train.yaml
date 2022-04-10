@@ -1,13 +1,13 @@
-data_dir: "/data/baryal/HKH/processed_L07_2015"
+data_dir: "/data/baryal/HKH/processed_L08_2015"
 gpu_rank: 0
 class_name: ["Clean Ice", "Debris Covered"]
 threshold: [0.99, 0.99]
 batch_size: 8
-run_name: "5_l07_se_rsi"
+run_name: "2_l08"
 epochs: 121
 save_every: None
-use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-normalize: "mean-std"
+use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+normalize: "min-max"
 loss_opts:
   name: "dice"
   masked: True
@@ -16,7 +16,7 @@ loss_opts:
   label_smoothing: 0.1
 model_opts:
   args:
-    inchannels: 13
+    inchannels: 11
     outchannels: 3
     net_depth: 4
     dropout: 0.2
@@ -32,5 +32,5 @@ metrics_opts: ["IoU", "precision", "recall"]
 fine_tune: False
 reg_opts:
   l1_reg: 0.0001
-comment: "All Landsat 7 + slope elevation + RSI, 2015"
+comment: "All Landsat 8"
 find_lr: False

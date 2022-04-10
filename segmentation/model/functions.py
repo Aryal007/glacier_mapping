@@ -209,7 +209,7 @@ def log_images(
         x = torch.clamp(x, 0, 1)
     try:
         writer.add_image(
-            f"{stage}/x", make_grid(pm(squash(x[:, :, :, [4, 3, 1]]))), epoch)
+            f"{stage}/x", make_grid(pm(squash(x[:, :, :, [5, 4, 2]]))), epoch)
     except Exception as e:
         writer.add_image(
             f"{stage}/x", make_grid(pm(squash(x[:, :, :, [0, 1, 2]]))), epoch)

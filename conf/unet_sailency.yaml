@@ -2,8 +2,8 @@ data_dir: "/data/baryal/HKH"
 normalize: "mean-std"
 gpu_rank: 0
 folder_name: "runs"
-run_name: "2_l08"
-processed_dir: "processed_L08_2015"
+run_name: "4_l07_rsi"
+processed_dir: "processed_L07_2005"
 threshold: [0.99, 0.99]
 model_opts:
   args:
@@ -19,4 +19,5 @@ optim_opts:
     lr: 0.001
 reg_opts:
   l1_reg: 0.0001
-use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
+split: "train"

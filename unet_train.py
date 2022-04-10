@@ -65,7 +65,7 @@ if __name__ == "__main__":
     out_dir = f"{data_dir}/runs/{run_name}/models/"
     loss_val = np.inf
 
-    #fn.print_conf(conf)
+    fn.print_conf(conf)
 
     with open(f"{data_dir}/runs/{run_name}/conf.json", 'w') as f:
         j = json.dumps(conf, sort_keys=True)
@@ -89,43 +89,16 @@ if __name__ == "__main__":
 
     for epoch in range(1, conf.epochs + 1):
         # train loop
-        loss_train, train_metric, loss_weights = fn.train_epoch(
-            epoch, train_loader, frame, conf)
-        fn.log_metrics(
-            writer,
-            train_metric,
-            epoch,
-            "train",
-            conf.log_opts.mask_names)
+        loss_train, train_metric, loss_weights = fn.train_epoch(epoch, train_loader, frame, conf)
+        fn.log_metrics(writer, train_metric, epoch, "train", conf.log_opts.mask_names)
 
         # validation loop
         new_loss_val, val_metric = fn.validate(epoch, val_loader, frame, conf)
-        fn.log_metrics(
-            writer,
-            val_metric,
-            epoch,
-            "val",
-            conf.log_opts.mask_names)
+        fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
 
         if (epoch - 1) % 5 == 0:
-            fn.log_images(
-                writer,
-                frame,
-                train_loader,
-                epoch,
-                "train",
-                conf.threshold,
-                conf.normalize,
-                _normalize)
-            fn.log_images(
-                writer,
-                frame,
-                val_loader,
-                epoch,
-                "val",
-                conf.threshold,
-                conf.normalize,
-                _normalize)
+            fn.log_images( writer, frame, train_loader, epoch, "train", conf.threshold, conf.normalize, _normalize)
+            fn.log_images(writer, frame, val_loader, epoch, "val", conf.threshold, conf.normalize, _normalize)
 
         # Save best model
         if new_loss_val < loss_val:
@@ -133,9 +106,7 @@ if __name__ == "__main__":
             loss_val = float(new_loss_val)
 
         lr = fn.get_current_lr(frame)
-        writer.add_scalars(
-            "Loss", {
-                "train": loss_train, "val": new_loss_val}, epoch)
+        writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
 
         writer.add_scalar("lr", lr, epoch)
 

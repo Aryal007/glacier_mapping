@@ -156,15 +156,7 @@ def add_index(tiff_np, index1, index2):
     return tiff_np
 
 
-def save_slices(
-        filename,
-        filenum,
-        tiff,
-        mask,
-        roi_mask,
-        savepath,
-        saved_df,
-        **conf):
+def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **conf):
     _mask = np.zeros((mask.shape[0], mask.shape[1]))
     roi_mask = np.squeeze(roi_mask) == 0
     for i in range(mask.shape[2]):
@@ -212,16 +204,17 @@ def save_slices(
         os.makedirs(conf["out_dir"])
 
     tiff_np = np.transpose(tiff.read(), (1, 2, 0))
+    tiff_np = np.nan_to_num(tiff_np)
     tiff_np = tiff_np[:, :, conf["use_bands"]]
     tiff_np[roi_mask] = 0
     tiff_np = tiff_np.astype(np.float32)
 
     if conf["add_ndvi"]:
-        tiff_np = add_index(tiff_np, index1=3, index2=2)
+        tiff_np = add_index(tiff_np, index1=4, index2=3)
     if conf["add_ndwi"]:
-        tiff_np = add_index(tiff_np, index1=3, index2=4)
+        tiff_np = add_index(tiff_np, index1=4, index2=5)
     if conf["add_ndsi"]:
-        tiff_np = add_index(tiff_np, index1=1, index2=4)
+        tiff_np = add_index(tiff_np, index1=2, index2=5)
     if conf["add_hsv"]:
         rgb_img = tiff_np[:, :, :3] / 255
         hsv_img = rgb2hsv(rgb_img[:, :, [2, 1, 0]])

@@ -1,6 +1,6 @@
-image_dir: "/data/baryal/HKH/Landsat7_2015/"
+image_dir: "/data/baryal/HKH/Landsat8_2015/"
 labels_dir: "/data/baryal/HKH/labels/"
-out_dir: "/data/baryal/HKH/processed_L07_2015/"
+out_dir: "/data/baryal/HKH/processed_L08_2015/"
 window_size: [512, 512]
 overlap: 32
 filter: 0.1
@@ -8,19 +8,5 @@ add_ndvi: True
 add_ndwi: True
 add_ndsi: True
 add_hsv: False
-bands:
-  [
-    "B1",
-    "B2",
-    "B3",
-    "B4",
-    "B5",
-    "B6_VCID_1",
-    "B6_VCID_2",
-    "B7",
-    "elevation",
-    "slope",
-    "aspect",
-    "hillshade",
-  ]
-use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+bands: ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "elevation", "slope"]
+use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]

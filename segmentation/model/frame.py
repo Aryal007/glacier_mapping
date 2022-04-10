@@ -290,3 +290,6 @@ class Framework:
             lr = lr * update_step
             self.optimizer.param_groups[0]["lr"] = lr
         return log_lrs[10:-5], losses[10:-5]
+
+    def get_model_device(self):
+        return self.model, self.device
