@@ -73,6 +73,8 @@ if __name__ == "__main__":
         pred = frame.infer(x)
         pred = torch.nn.Softmax(3)(pred)
         pred = np.squeeze(pred.cpu())
+        prob_pred = pred
+        prob_pred[mask] = 0
         
         _pred = np.zeros((pred.shape[0], pred.shape[1]))
         for k, v in labels_dict.items():
@@ -88,7 +90,7 @@ if __name__ == "__main__":
         debris_precision, debris_recall, debris_iou = get_precision_recall_iou(debris_tp, debris_fp, debris_fn)
         _row = [save_fname, ci_precision, ci_recall, ci_iou, debris_precision, debris_recall, debris_iou]
         df = df.append(pd.DataFrame([_row], columns=columns), ignore_index=True)
-        np.save(preds_dir / save_fname, pred.numpy())
+        np.save(preds_dir / save_fname, prob_pred.numpy())
         ci_tp_sum += ci_tp
         ci_fp_sum += ci_fp
         ci_fn_sum += ci_fn

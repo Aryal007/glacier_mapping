@@ -85,7 +85,7 @@ class GlacierDataset(Dataset):
         """
         data = np.load(self.img_files[index])
         data = data[:, :, self.use_channels]
-        _mask = np.sum(data[:, :, :7], axis=2) == 0
+        _mask = np.sum(data, axis=2) == 0
         if self.normalize == "min-max":
             data = np.clip(data, self.min, self.max)
             data = (data - self.min) / (self.max - self.min)

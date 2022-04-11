@@ -72,12 +72,24 @@ def get_scatter():
     ], className="col-xl-3 col-lg-4")
     return image
 
+def get_roc():
+    image = html.Div([
+        html.Div([
+            html.Div([
+                html.H6("ROC Curve", className="m-0 font-weight-bold text-primary")
+            ], className="card-header py-3"),
+            html.Div([
+                html.Div([
+
+                ], id="roc-div"),
+            ], className="card-body p-0"),
+        ], className="card shadow mb-4 h-100")
+    ], className="col-xl-3 col-lg-4")
+    return image
+
 def get_sidebar():
     sidebar = html.Ul([
         html.A([
-            html.Div([
-                html.I(className="fas fa-laugh-wink")
-            ], className="sidebar-brand-icon rotate-n-15"),
             html.Div([
                 "Glacier Mapping"
             ], className="sidebar-brand-text mx-3")
@@ -116,7 +128,8 @@ def get_page_content(obj):
         html.Div([
             get_image("Image", "x-div"),
             get_image("True Labels", "y-true-div"),
-            get_image("Predicted Labels", "y-pred-div")
+            get_image("Predicted Labels", "y-pred-div"),
+            get_roc()
         ], className="row"),
         html.Div([
             get_card("Precision", "precision-div"),

@@ -5,9 +5,9 @@ import os
 class Base():
     def __init__(self):
         self.data_dir = Path("/data/baryal/HKH/")
-        self.processed_folder = "processed_L08_2015"
+        self.processed_folder = "processed_L07_2005"
         self.processed_dir = self.data_dir / self.processed_folder
-        self.preds_folder = "2_l08"
+        self.preds_folder = "1_rgb"
         self.preds_dir = self.data_dir / self.processed_folder / "preds" / self.preds_folder
 
     def get_df(self):

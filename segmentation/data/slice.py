@@ -180,11 +180,12 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
 
     def filter_percentage(slice, percentage, type="mask"):
         if type == "image":
-            labelled_pixels = np.sum(np.sum(slice[:, :, :5], axis=2) != 0)
+            labelled_pixels = np.sum(np.sum(slice, axis=2) != 0)
             percentage = 0.5
         else:
             labelled_pixels = np.sum(slice != 0)
         total_pixels = slice.shape[0] * slice.shape[1]
+
         if labelled_pixels / total_pixels < percentage:
             return False
         return True
@@ -193,7 +194,7 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
         np.save(filename, arr)
 
     def get_pixel_count(tiff_slice, mask_slice):
-        mas = np.sum(tiff_slice[:, :, :5], axis=2) == 0
+        mas = np.sum(tiff_slice, axis=2) == 0
         mask_slice[mas] = 0
         deb, ci = np.sum(mask_slice == 2), np.sum(mask_slice == 1)
         mas = np.sum(mas)
@@ -205,8 +206,15 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
 
     tiff_np = np.transpose(tiff.read(), (1, 2, 0))
     tiff_np = np.nan_to_num(tiff_np)
+    if "LE07" in filename:
+        tiff_np[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
+    elif "LC08" in filename:
+        tiff_np[np.sum(tiff_np[:, :, :10], axis=2) == 0] = 0
+    else:
+        raise ValueError("Not a Landsat 7 or landsat 8 slice?")
     tiff_np = tiff_np[:, :, conf["use_bands"]]
     tiff_np[roi_mask] = 0
+    mask[roi_mask] = 0
     tiff_np = tiff_np.astype(np.float32)
 
     if conf["add_ndvi"]:
@@ -229,6 +237,7 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
             if filter_percentage(mask_slice, conf["filter"]):
                 tiff_slice = tiff_np[row:row + conf["window_size"][0], column:column + conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
+
                 if filter_percentage(tiff_slice, conf["filter"], type="image"):
                     mask_fname, tiff_fname = "mask_" + str(filenum) + "_slice_" + str( slicenum), "tiff_" + str(filenum) + "_slice_" + str(slicenum)
                     bg, ci, deb, mas = get_pixel_count(tiff_slice, mask_slice)

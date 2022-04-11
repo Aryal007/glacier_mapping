@@ -1,6 +1,8 @@
 from dash.dependencies import Output, Input
 from dash import dcc
+from sklearn.metrics import roc_curve, roc_auc_score
 import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 
 def register_callbacks(app, obj, layout):
@@ -140,3 +142,57 @@ def register_callbacks(app, obj, layout):
         fig.update_layout(yaxis_range=[0,1])
         
         return dcc.Graph(figure=fig, style={'height': '100%'})
+
+    @app.callback(
+        Output('roc-div', 'children'),
+        Input('main-table', 'active_cell'))
+    def display_click_data(active_cell):
+        classes = {0: "Background",
+                1: "Clean Ice",
+                2: "Debris"}
+        if active_cell is None:
+            row_id = 1
+        else:
+            row_id = active_cell['row_id']
+        fname = str(obj.get_df().iloc[row_id]["tile_name"])
+        fname = fname.replace("pred", "tiff")
+        figpath = obj.get_processed_dir() / "test" / fname
+        x = np.load(figpath)
+        mask = np.sum(x[:,:,:5], axis=2) == 0
+        true_fname = fname.replace("tiff", "mask")
+        y_true = np.load(obj.get_processed_dir() / "test" / true_fname)
+        pred_fname = fname.replace("tiff", "pred")
+        figpath = obj.get_preds_dir() / pred_fname
+        y_pred = np.load(figpath)
+        y_true[mask], y_pred[mask] = 0, 0
+
+        fig = go.Figure()
+        fig.add_shape(
+            type='line', line=dict(dash='dash'),
+            x0=0, x1=1, y0=0, y1=1
+        )
+        for i in range(len(set(y_true.flatten()))):
+            _y_true = (y_true[np.invert(mask)].flatten() == i).astype(np.int32)
+            _y_score = y_pred[:,:,i][np.invert(mask)].flatten()
+
+            fpr, tpr, _ = roc_curve(_y_true, _y_score)
+            auc_score = roc_auc_score(_y_true, _y_score)
+
+            name = f"{classes[i]} (AUC={auc_score:.2f})"
+            fig.add_trace(go.Scatter(x=fpr, y=tpr, name=name, mode='lines'))
+
+        fig.update_layout(
+            xaxis_title='False Positive Rate',
+            yaxis_title='True Positive Rate',
+            yaxis=dict(scaleanchor="x", scaleratio=1),
+            xaxis=dict(constrain='domain'),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
+        )
+
+        return dcc.Graph(figure=fig)
