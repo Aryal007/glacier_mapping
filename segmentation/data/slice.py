@@ -114,6 +114,7 @@ def get_mask(tiff, shp, column="Glaciers"):
         bbox_poly = gpd.GeoDataFrame({'geometry': bbox}, index=[
                                      0], crs=img_meta["crs"].data)
         return shp.loc[shp.intersects(bbox_poly["geometry"][0])]
+    
     classes = sorted(list(set(shp[column])))
     print(f"Classes = {classes}")
 
@@ -156,9 +157,8 @@ def add_index(tiff_np, index1, index2):
     return tiff_np
 
 
-def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **conf):
+def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
     _mask = np.zeros((mask.shape[0], mask.shape[1]))
-    roi_mask = np.squeeze(roi_mask) == 0
     for i in range(mask.shape[2]):
         _mask[mask[:, :, i] == 1] = i + 1
     mask = _mask.astype(np.uint8)
@@ -206,15 +206,12 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
 
     tiff_np = np.transpose(tiff.read(), (1, 2, 0))
     tiff_np = np.nan_to_num(tiff_np)
-    if "LE07" in filename:
-        tiff_np[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
-    elif "LC08" in filename:
-        tiff_np[np.sum(tiff_np[:, :, :10], axis=2) == 0] = 0
-    else:
-        raise ValueError("Not a Landsat 7 or landsat 8 slice?")
+    dem_np = np.transpose(dem.read(), (1, 2, 0))
+    dem_np = np.nan_to_num(dem_np)
+    tiff_np = np.concatenate((tiff_np, dem_np), axis=2)
+    tiff_np[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
+    mask[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
     tiff_np = tiff_np[:, :, conf["use_bands"]]
-    tiff_np[roi_mask] = 0
-    mask[roi_mask] = 0
     tiff_np = tiff_np.astype(np.float32)
 
     if conf["add_ndvi"]:
@@ -224,7 +221,7 @@ def save_slices(filename, filenum, tiff, mask, roi_mask, savepath, saved_df, **c
     if conf["add_ndsi"]:
         tiff_np = add_index(tiff_np, index1=2, index2=5)
     if conf["add_hsv"]:
-        rgb_img = tiff_np[:, :, :3] / 255
+        rgb_img = tiff_np[:, :, [4,3,1]] / 255
         hsv_img = rgb2hsv(rgb_img[:, :, [2, 1, 0]])
         tiff_np = np.concatenate((tiff_np, hsv_img), axis=2)
 
