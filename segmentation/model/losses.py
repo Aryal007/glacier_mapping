@@ -48,7 +48,6 @@ class diceloss(torch.nn.Module):
                     _target[i, j, :, :] = gaussian(
                         target[i, j, :, :].cpu(), self.gaussian_blur_sigma)
             target = torch.from_numpy(_target).to(mask.device)
-
         target = target * (1 - self.label_smoothing) + \
             self.label_smoothing / self.outchannels
         pred = self.act(pred).permute(0, 2, 3, 1)
@@ -170,7 +169,7 @@ class focalloss(torch.nn.modules.loss._WeightedLoss):
 
     def forward(self, pred, target):
         focal_loss = sigmoid_focal_loss(
-            pred, target, alpha=-1, gamma=2, reduction="mean")
+            pred, target, alpha=-1, gamma=3, reduction="mean")
         return focal_loss
 
 

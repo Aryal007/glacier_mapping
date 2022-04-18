@@ -38,9 +38,9 @@ for split, meta in splits.items():
     means, stds, mins, maxs = [], [], [], []
     savepath = Path(conf["out_dir"]) / split
     fn.remove_and_create(savepath)
-    for i, filename in enumerate(meta):
-        filename = Path(conf.image_dir) / filename
-        dem_filename = Path(conf.dem_dir) / filename
+    for i, _filename in enumerate(meta):
+        filename = Path(conf.image_dir) / _filename
+        dem_filename = Path(conf.dem_dir) / _filename
         print(f"Filename: {filename.name}")
         tiff = fn.read_tiff(filename)
         dem = fn.read_tiff(dem_filename)

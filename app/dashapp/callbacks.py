@@ -18,7 +18,7 @@ def register_callbacks(app, obj, layout):
         fname = str(obj.get_df().iloc[row_id]["tile_name"])
         fname = fname.replace("pred", "tiff")
         figpath = obj.get_processed_dir() / "test" / fname
-        fig = np.load(figpath)[:,:,[5,4,2]]
+        fig = np.load(figpath)[:,:,[4,3,1]]
         fig = (fig - np.min(fig, axis=(0,1)))/(np.max(fig, axis=(0,1)) - np.min(fig, axis=(0,1)))
         fig = px.imshow(fig)
         fig.update_layout(layout)

@@ -5,16 +5,13 @@ Created on Wed Feb 24 13:26:56 2021
 
 @author: mibook
 """
-import rasterio
+import rasterio, os, shutil, pdb
 import geopandas as gpd
 from shapely.geometry import Polygon, box
 from rasterio.features import rasterize
 from shapely.ops import cascaded_union
 import numpy as np
 from pathlib import Path
-import os
-import shutil
-import pdb
 from skimage.color import rgb2hsv
 
 
@@ -208,6 +205,8 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
     tiff_np = np.nan_to_num(tiff_np)
     dem_np = np.transpose(dem.read(), (1, 2, 0))
     dem_np = np.nan_to_num(dem_np)
+    dem_np = np.concatenate((dem_np, np.cos(dem_np[:,:,2][:,:,None])), axis=2)
+    dem_np[:,:,2] = np.sin(dem_np[:,:,2])
     tiff_np = np.concatenate((tiff_np, dem_np), axis=2)
     tiff_np[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
     mask[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0

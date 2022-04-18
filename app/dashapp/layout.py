@@ -109,7 +109,7 @@ def get_topbar(obj):
     topbar = html.Nav([
         html.Form([
             html.Span("Processed dirs: ", className="mr-2"),
-            dcc.Dropdown(obj.get_all_processed_folders(), obj.get_processed_folder(), id='processed-dirs-dropdown', style={'width': '200px'}),
+            dcc.Dropdown(obj.get_all_processed_folders(), obj.get_processed_folder(), id='processed-dirs-dropdown', style={'width': '400px'}),
             html.Span("Runs: ", className="ml-2 mr-2"),
             dcc.Dropdown(obj.get_all_preds_folders(), obj.get_preds_folder(), id='runs-dropdown', style={'width': '200px'}),
         ], className="d-none d-sm-flex form-inline mr-auto ml-md-3 my-2 my-md-0 mw-100")

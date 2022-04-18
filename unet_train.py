@@ -82,8 +82,8 @@ if __name__ == "__main__":
         _normalize = (_normalize[2][conf.use_channels],
                       _normalize[3][conf.use_channels])
     elif conf.normalize == "mean-std":
-        _normalize = (_normalize[0][conf.use_channels],
-                      _normalize[1][conf.use_channels])
+        _normalize = (np.append(_normalize[0],0)[conf.use_channels],
+                      np.append(_normalize[1],1)[conf.use_channels])
     else:
         raise ValueError("Normalize must be min-max or mean-std")
 

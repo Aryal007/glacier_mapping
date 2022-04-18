@@ -173,7 +173,7 @@ def log_images(
         0: np.array((255, 0, 0)),
         1: np.array((222, 184, 135)),
         2: np.array((95, 158, 160)),
-        3: np.array((165, 42, 42)),
+        #3: np.array((165, 42, 42)),
     }
 
     def pm(x): return x.permute(0, 3, 1, 2)
@@ -183,15 +183,15 @@ def log_images(
     y_hat = frame.act(frame.infer(x))
     y = np.argmax(y.cpu().numpy(), axis=3) + 1
 
-    _y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2]))
-    y_hat = y_hat.cpu().numpy()
-    for i in range(1, 3):
-        _y_hat[y_hat[:, :, :, i] >= threshold[i - 1]] = i + 1
-    _y_hat[_y_hat == 0] = 1
-    _y_hat[y_mask] = 0
-    y_hat = _y_hat
+    #_y_hat = np.zeros((y_hat.shape[0], y_hat.shape[1], y_hat.shape[2]))
+    #y_hat = y_hat.cpu().numpy()
+    #for i in range(1, 3):
+    #    _y_hat[y_hat[:, :, :, i] >= threshold[i - 1]] = i + 1
+    #_y_hat[_y_hat == 0] = 1
+    #_y_hat[y_mask] = 0
+    #y_hat = _y_hat
 
-    #y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
+    y_hat = np.argmax(y_hat.cpu().numpy(), axis=3) + 1
 
     y[y_mask] = 0
     y_hat[y_mask] = 0
@@ -209,7 +209,7 @@ def log_images(
         x = torch.clamp(x, 0, 1)
     try:
         writer.add_image(
-            f"{stage}/x", make_grid(pm(squash(x[:, :, :, [5, 4, 2]]))), epoch)
+            f"{stage}/x", make_grid(pm(squash(x[:, :, :, [4, 3, 1]]))), epoch)
     except Exception as e:
         writer.add_image(
             f"{stage}/x", make_grid(pm(squash(x[:, :, :, [0, 1, 2]]))), epoch)
