@@ -92,7 +92,11 @@ if __name__ == "__main__":
         _pred = _pred+1
         _pred[mask] = 0
         y_pred = _pred
-
+        y_pred_prob = np.zeros((pred_debris.shape[0], pred_debris.shape[1], 3))
+        y_pred_prob[:,:,1] = pred_cleanice[:, :, 1]
+        y_pred_prob[:,:,2] = pred_debris[:, :, 1]
+        y_pred_prob[:,:,0] = np.min(np.concatenate((pred_cleanice[:, :, 0][:,:, None], pred_debris[:, :, 0][:,:,None]), axis=2), axis=2)
+        y_pred_prob[mask] = 0
         ci_pred, debris_pred = y_pred == 2, y_pred == 3
         ci_true, debris_true = y_cleanice_true == 2, y_debris_true == 2
         ci_tp, ci_fp, ci_fn = get_tp_fp_fn(ci_pred, ci_true)
@@ -101,7 +105,7 @@ if __name__ == "__main__":
         debris_precision, debris_recall, debris_iou = get_precision_recall_iou(debris_tp, debris_fp, debris_fn)
         _row = [save_fname, ci_precision, ci_recall, ci_iou, debris_precision, debris_recall, debris_iou]
         df = df.append(pd.DataFrame([_row], columns=columns), ignore_index=True)
-        np.save(preds_dir / save_fname, y_pred)
+        np.save(preds_dir / save_fname, y_pred_prob)
         ci_tp_sum += ci_tp
         ci_fp_sum += ci_fp
         ci_fn_sum += ci_fn

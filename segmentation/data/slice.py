@@ -13,6 +13,7 @@ from shapely.ops import cascaded_union
 import numpy as np
 from pathlib import Path
 from skimage.color import rgb2hsv
+from rasterio.warp import transform
 
 
 def read_shp(filename):
@@ -200,15 +201,47 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
 
     if not os.path.exists(conf["out_dir"]):
         os.makedirs(conf["out_dir"])
+    
+    def compute_dems(dem_np):
+        elevation = dem_np[:,:,0][:,:,None]
+        slope = dem_np[:,:,1][:,:,None]
+        slope = np.sin(slope*np.pi/180)
+        aspect = dem_np[:,:,2][:,:,None]
+        curvature = dem_np[:,:,3][:,:,None]
+        curvature = np.sin(curvature*np.pi/180)
+        aspect_sin = np.sin(aspect*np.pi/180)
+        aspect_cos = np.cos(aspect*np.pi/180)
+        slope_aspect_sin = slope*aspect_sin
+        slope_aspect_cos = slope*aspect_cos
+        dem_np = np.concatenate((elevation, slope_aspect_sin, 
+                                slope_aspect_cos, curvature), axis=2)
+        return dem_np
+
+    def compute_lat_lon(dem):
+        x = np.linspace(0, dem.shape[1]-1, dem.shape[1]).astype(np.int64)
+        y = np.linspace(0, dem.shape[0]-1, dem.shape[0]).astype(np.int64)
+        xv, yv = np.meshgrid(x,y)
+        idx = np.zeros((dem.shape[0], dem.shape[1], 2))
+        idx[:,:,0] = xv
+        idx[:,:,1] = yv
+        lat_lon = np.apply_along_axis(
+            lambda x:rasterio.transform.xy(dem.transform, x[0], x[1]), 
+        axis=2, arr=idx)
+        lon, lat = transform(dem.crs, {'init': 'EPSG:4326'},
+                     lat_lon[:,:,0].flatten(), lat_lon[:,:,1].flatten())
+        lon = np.asarray(lon).reshape(dem.shape)
+        lat = np.asarray(lat).reshape(dem.shape)
+        lat_lon = np.concatenate((lat[:,:,None], lon[:,:,None]), axis=2)
+        return lat_lon
 
     tiff_np = np.transpose(tiff.read(), (1, 2, 0))
     tiff_np = np.nan_to_num(tiff_np)
     dem_np = np.transpose(dem.read(), (1, 2, 0))
     dem_np = np.nan_to_num(dem_np)
-    dem_np = np.concatenate((dem_np, np.cos(dem_np[:,:,2][:,:,None])), axis=2)
-    dem_np[:,:,2] = np.sin(dem_np[:,:,2])
+    dem_np = compute_dems(dem_np)
     tiff_np = np.concatenate((tiff_np, dem_np), axis=2)
-    tiff_np[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
+    lat_lon_np = compute_lat_lon(dem)
+    tiff_np = np.concatenate((tiff_np, lat_lon_np), axis=2)
     mask[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
     tiff_np = tiff_np[:, :, conf["use_bands"]]
     tiff_np = tiff_np.astype(np.float32)
@@ -226,8 +259,8 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
 
     slicenum = 0
     for row in range(0, tiff_np.shape[0], conf["window_size"][0] - conf["overlap"]):
-        for column in range( 0, tiff_np.shape[0], conf["window_size"][1] - conf["overlap"]):
-            mask_slice = mask[row:row + conf["window_size"] [0], column:column + conf["window_size"][1]]
+        for column in range(0, tiff_np.shape[0], conf["window_size"][1] - conf["overlap"]):
+            mask_slice = mask[row:row + conf["window_size"][0], column:column + conf["window_size"][1]]
             mask_slice = verify_slice_size(mask_slice, conf)
 
             if filter_percentage(mask_slice, conf["filter"]):
@@ -241,6 +274,7 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
                     _row = [filename, filenum, slicenum, bg, ci, deb, mas, bg / _tot, ci / _tot, deb / _tot, mas / _tot, os.path.basename(savepath)]
                     saved_df.loc[len(saved_df.index)] = _row
                     save_slice(mask_slice, savepath / mask_fname)
+                    tiff_slice[np.sum(tiff_slice[:, :, :7], axis=2) == 0] = 0
                     save_slice(tiff_slice, savepath / tiff_fname)
                     print(f"Saved image {filenum} slice {slicenum}")
             slicenum += 1

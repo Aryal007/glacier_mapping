@@ -22,26 +22,11 @@ class ConvBlock(nn.Module):
     outchannels, via two convolution / relu pairs.
     """
 
-    def __init__(
-            self,
-            inchannels,
-            outchannels,
-            dropout,
-            spatial,
-            kernel_size=3,
-            padding=1):
+    def __init__(self,inchannels,outchannels,dropout,spatial,kernel_size=3,padding=1):
         super().__init__()
         self.outchannels = outchannels
-        self.conv1 = nn.Conv2d(
-            inchannels,
-            outchannels,
-            kernel_size=kernel_size,
-            padding=padding)
-        self.conv2 = nn.Conv2d(
-            outchannels,
-            outchannels,
-            kernel_size=kernel_size,
-            padding=padding)
+        self.conv1 = nn.Conv2d(inchannels,outchannels,kernel_size=kernel_size,padding=padding)
+        self.conv2 = nn.Conv2d(outchannels,outchannels,kernel_size=kernel_size,padding=padding)
         self.conv_bn = nn.BatchNorm2d(outchannels)
         if dropout > 0:
             if spatial:
@@ -76,8 +61,7 @@ class UpBlock(nn.Module):
         self.upconv = nn.ConvTranspose2d(
             inchannels, outchannels, kernel_size=kernel_size, stride=stride
         )
-        if dropout > 0:
-            self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
+        self.conv = ConvBlock(inchannels, outchannels, dropout, spatial)
 
     def forward(self, x, skips):
         x = self.upconv(x)
@@ -93,14 +77,7 @@ class Unet(nn.Module):
     a U-Net model.
     """
 
-    def __init__(
-            self,
-            inchannels,
-            outchannels,
-            net_depth,
-            dropout=0.2,
-            spatial=False,
-            first_channel_output=16):
+    def __init__(self,inchannels,outchannels,net_depth,dropout=0.2,spatial=False,first_channel_output=16):
         super().__init__()
         self.downblocks = nn.ModuleList()
         self.upblocks = nn.ModuleList()

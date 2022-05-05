@@ -223,10 +223,6 @@ def log_images(
 def get_loss(outchannels, opts=None):
     if opts is None:
         return diceloss()
-    if opts.weights == "None":
-        loss_weight = np.ones(outchannels) / outchannels
-    else:
-        loss_weight = opts.weights
     if opts.label_smoothing == "None":
         label_smoothing = 0
     else:

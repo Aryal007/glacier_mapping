@@ -63,14 +63,9 @@ def register_callbacks(app, obj, layout):
         else:
             row_id = active_cell['row_id']
         fname = str(obj.get_df().iloc[row_id]["tile_name"])
-        fname = fname.replace("pred", "tiff")
-        figpath = obj.get_processed_dir() / "test" / fname
-        x = np.load(figpath)
-        mask = np.sum(x[:,:,:5], axis=2) == 0
         fname = fname.replace("tiff", "pred")
         figpath = obj.get_preds_dir() / fname
         y = np.load(figpath)
-        y[mask] = 0
         fig = px.imshow(y)
         fig.update_layout(layout)
         fig.update_xaxes(showticklabels=False)
