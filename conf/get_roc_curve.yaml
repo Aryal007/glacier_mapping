@@ -1,21 +1,20 @@
-data_dir: "/data/baryal/HKH/processed_L08_2015"
+data_dir: "/data/baryal/HKH/processed_L07_2005_cleanice"
 gpu_rank: 0
-run_name: "2_l08"
+run_name: "5_l07_esacac_hsv_test5"
 normalize: "mean-std"
 class_name: 
   clean_ice: 1
-  debris: 2
 batch_size: 32
-use_channels: [0,1,2,3,4,5,6,7,8,9,10]
+use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 13, 14, 18, 19, 20]
 loss_opts:
   name: "dice"
   masked: True
-  weights: [1,1,1]
+  weights: [1,1]
   label_smoothing: 0.1
 model_opts:
   args: 
-    inchannels: 11
-    outchannels: 3
+    inchannels: 15
+    outchannels: 2
     net_depth: 4
     dropout: 0.2
     spatial: True

@@ -14,14 +14,11 @@ from .unet import *
 from .metrics import *
 
 import numpy as np
-import os
+import os, torch, math, random
 import pdb
-import torch
-import math
 from tqdm import tqdm
 from pathlib import Path
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
-
 
 class Framework:
     """
@@ -41,10 +38,19 @@ class Framework:
             optimizer_opts = {"name": "Adam", "args": {"lr": 0.001}}
         self.multi_class = True if model_opts.args.outchannels > 1 else False
         self.num_classes = model_opts.args.outchannels
+        if loss_opts is not None:
+            self.loss_alpha = torch.tensor([loss_opts.alpha]).to(self.device)
+        else:
+            self.loss_alpha = torch.tensor([0.0]).to(self.device)
+        self.k = 1
+        self.sigma1, self.sigma2 = torch.tensor([1.0]).to(self.device), torch.tensor([1.0]).to(self.device)
+        self.sigma1, self.sigma2 = self.sigma1.requires_grad_(), self.sigma2.requires_grad_()
+        #self.loss_alpha = self.loss_alpha.requires_grad_()
         self.loss_fn = loss_fn.to(self.device)
         self.model = Unet(**model_opts.args).to(self.device)
-        _optimizer_params = [
-            {'params': self.model.parameters(), **optimizer_opts["args"]}]
+        _optimizer_params = [{'params': self.model.parameters(), **optimizer_opts["args"]},
+                            {'params': self.sigma1, **optimizer_opts["args"]},
+                            {'params': self.sigma2, **optimizer_opts["args"]}]
         if loss_opts is None:
             self.loss_weights = torch.tensor([1.0, 1.0, 1.0]).to(self.device)
         else:
@@ -53,17 +59,17 @@ class Framework:
         self.optimizer = optimizer_def(_optimizer_params)
         self.lrscheduler = ReduceLROnPlateau(self.optimizer, "min",
                                              verbose=True,
-                                             patience=4,
+                                             patience=15,
                                              factor=0.1,
                                              min_lr=1e-9)
-        self.lrscheduler2 = CyclicLR(
-            self.optimizer,
-            base_lr=optimizer_opts["args"]["lr"] * 0.01,
-            max_lr=optimizer_opts["args"]["lr"],
-            mode='triangular2',
-            step_size_up=20,
-            verbose=True,
-            cycle_momentum=False)
+        #self.lrscheduler2 = CyclicLR(
+        #    self.optimizer,
+        #    base_lr=optimizer_opts["args"]["lr"] * 0.001,
+        #    max_lr=optimizer_opts["args"]["lr"],
+        #    mode='triangular2',
+        #    step_size_up=30,
+        #    verbose=True,
+        #    cycle_momentum=False)
         #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
@@ -98,8 +104,8 @@ class Framework:
         """
         Update the LR Scheduler
         """
-        self.lrscheduler2.step()
-        # self.lrscheduler.step(val_loss)
+        #self.lrscheduler2.step()
+        self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
         """
@@ -139,22 +145,27 @@ class Framework:
         """
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
-        loss = self.loss_fn(y_hat, y)
-        loss = loss * self.loss_weights
-        loss = loss.sum()
+        #loss = self.loss_fn(y_hat, y)
+        diceloss, boundaryloss = self.loss_fn(y_hat, y)
+        diceloss = diceloss.sum() * self.k
+        #loss = torch.add(torch.mul(diceloss.clone(), self.loss_alpha), torch.mul(boundaryloss.clone(), (1-self.loss_alpha)))
+        loss = torch.add(
+                torch.add(
+                    torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma1))), diceloss.clone()), 
+                    torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma2))), boundaryloss.clone())
+                    ),
+                torch.abs(torch.log(torch.mul(self.sigma1, self.sigma2)))
+                )
         if self.reg_opts:
             for reg_type in self.reg_opts.keys():
                 reg_fun = globals()[reg_type]
-                penalty = reg_fun(
-                    self.model.parameters(),
-                    self.reg_opts[reg_type],
-                    self.device
-                )
+                penalty = reg_fun(self.model.parameters(),self.reg_opts[reg_type],self.device)
                 loss += penalty
-        return loss
-
-    def get_loss_weights(self):
-        return self.loss_weights.cpu()
+        return loss.abs()
+    
+    def get_loss_alpha(self):
+        #return self.loss_alpha.item()
+        return (self.sigma1.item(), self.sigma2.item())
 
     def metrics(self, y_hat, y, mask, threshold):
         """ Loop over metrics in train.yaml
@@ -173,11 +184,11 @@ class Framework:
         for i in range(1, n_classes):
             _y_hat[y_hat[:, :, :, i] >= threshold[i - 1]] = i + 1
         _y_hat[_y_hat == 0] = 1
-        _y_hat[mask] = 0
+        _y_hat[mask] = -1
         y_hat = _y_hat
 
         y = np.argmax(y.cpu().numpy(), axis=3) + 1
-        y[mask] = 0
+        y[mask] = -1
 
         tp, fp, fn = torch.zeros(n_classes), torch.zeros(
             n_classes), torch.zeros(n_classes)

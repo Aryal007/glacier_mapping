@@ -164,14 +164,10 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
     def verify_slice_size(slice, conf):
         if slice.shape[0] != conf["window_size"][0] or slice.shape[1] != conf["window_size"][1]:
             if len(slice.shape) == 2:
-                temp = np.zeros(
-                    (conf["window_size"][0], conf["window_size"][1]))
+                temp = np.zeros((conf["window_size"][0], conf["window_size"][1]))
                 temp[0:slice.shape[0], 0:slice.shape[1]] = slice
             else:
-                temp = np.zeros(
-                    (conf["window_size"][0],
-                     conf["window_size"][1],
-                        slice.shape[2]))
+                temp = np.zeros((conf["window_size"][0],conf["window_size"][1],slice.shape[2]))
                 temp[0:slice.shape[0], 0:slice.shape[1], :] = slice
             slice = temp
         return slice
@@ -208,7 +204,6 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
         slope = np.sin(slope*np.pi/180)
         aspect = dem_np[:,:,2][:,:,None]
         curvature = dem_np[:,:,3][:,:,None]
-        curvature = np.sin(curvature*np.pi/180)
         aspect_sin = np.sin(aspect*np.pi/180)
         aspect_cos = np.cos(aspect*np.pi/180)
         slope_aspect_sin = slope*aspect_sin
@@ -229,35 +224,33 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
         axis=2, arr=idx)
         lon, lat = transform(dem.crs, {'init': 'EPSG:4326'},
                      lat_lon[:,:,0].flatten(), lat_lon[:,:,1].flatten())
-        lon = np.asarray(lon).reshape(dem.shape)
-        lat = np.asarray(lat).reshape(dem.shape)
+        lon = np.asarray(lon).reshape(dem.shape).astype(np.float32)
+        lat = np.asarray(lat).reshape(dem.shape).astype(np.float32)
         lat_lon = np.concatenate((lat[:,:,None], lon[:,:,None]), axis=2)
         return lat_lon
 
-    tiff_np = np.transpose(tiff.read(), (1, 2, 0))
+    tiff_np = np.transpose(tiff.read(), (1, 2, 0)).astype(np.float32)
     tiff_np = np.nan_to_num(tiff_np)
-    dem_np = np.transpose(dem.read(), (1, 2, 0))
+    dem_np = np.transpose(dem.read(), (1, 2, 0)).astype(np.float32)
     dem_np = np.nan_to_num(dem_np)
     dem_np = compute_dems(dem_np)
-    tiff_np = np.concatenate((tiff_np, dem_np), axis=2)
     lat_lon_np = compute_lat_lon(dem)
-    tiff_np = np.concatenate((tiff_np, lat_lon_np), axis=2)
-    mask[np.sum(tiff_np[:, :, :7], axis=2) == 0] = 0
+    tiff_np = np.concatenate((tiff_np, dem_np, lat_lon_np), axis=2)
     tiff_np = tiff_np[:, :, conf["use_bands"]]
-    tiff_np = tiff_np.astype(np.float32)
+    tiff_np = np.nan_to_num(tiff_np.astype(np.float32))
 
     if conf["add_ndvi"]:
-        tiff_np = add_index(tiff_np, index1=4, index2=3)
+        tiff_np = add_index(tiff_np, index1=3, index2=2)
     if conf["add_ndwi"]:
-        tiff_np = add_index(tiff_np, index1=4, index2=5)
+        tiff_np = add_index(tiff_np, index1=1, index2=3)
     if conf["add_ndsi"]:
-        tiff_np = add_index(tiff_np, index1=2, index2=5)
+        tiff_np = add_index(tiff_np, index1=1, index2=4)
     if conf["add_hsv"]:
         rgb_img = tiff_np[:, :, [4,3,1]] / 255
         hsv_img = rgb2hsv(rgb_img[:, :, [2, 1, 0]])
         tiff_np = np.concatenate((tiff_np, hsv_img), axis=2)
-
     slicenum = 0
+
     for row in range(0, tiff_np.shape[0], conf["window_size"][0] - conf["overlap"]):
         for column in range(0, tiff_np.shape[0], conf["window_size"][1] - conf["overlap"]):
             mask_slice = mask[row:row + conf["window_size"][0], column:column + conf["window_size"][1]]
@@ -266,22 +259,19 @@ def save_slices(filename, filenum, tiff, dem, mask, savepath, saved_df, **conf):
             if filter_percentage(mask_slice, conf["filter"]):
                 tiff_slice = tiff_np[row:row + conf["window_size"][0], column:column + conf["window_size"][1], :]
                 tiff_slice = verify_slice_size(tiff_slice, conf)
+                final_save_slice = np.copy(tiff_slice)
 
-                if filter_percentage(tiff_slice, conf["filter"], type="image"):
+                if filter_percentage(final_save_slice, conf["filter"], type="image"):
                     mask_fname, tiff_fname = "mask_" + str(filenum) + "_slice_" + str( slicenum), "tiff_" + str(filenum) + "_slice_" + str(slicenum)
-                    bg, ci, deb, mas = get_pixel_count(tiff_slice, mask_slice)
+                    bg, ci, deb, mas = get_pixel_count(final_save_slice, mask_slice)
                     _tot = bg + ci + deb + mas
                     _row = [filename, filenum, slicenum, bg, ci, deb, mas, bg / _tot, ci / _tot, deb / _tot, mas / _tot, os.path.basename(savepath)]
                     saved_df.loc[len(saved_df.index)] = _row
                     save_slice(mask_slice, savepath / mask_fname)
-                    tiff_slice[np.sum(tiff_slice[:, :, :7], axis=2) == 0] = 0
-                    save_slice(tiff_slice, savepath / tiff_fname)
+                    final_save_slice[np.sum(final_save_slice[:, :, :7], axis=2) == 0] = 0
+                    save_slice(final_save_slice, savepath / tiff_fname)
                     print(f"Saved image {filenum} slice {slicenum}")
             slicenum += 1
-
-    tiff_np = np.nan_to_num(tiff_np.astype(np.float64))
-    if np.isnan(np.sum(np.std(tiff_np, axis=(0, 1)))):
-        print("***********NaN Value encountered**************")
     return np.mean(tiff_np, axis=(0, 1)), np.std(tiff_np, axis=(0, 1)), np.min(tiff_np, axis=(0, 1)), np.max(tiff_np, axis=(0, 1)), saved_df
 
 def remove_and_create(dirpath):

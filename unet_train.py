@@ -21,9 +21,13 @@ import pdb
 from torch.utils.tensorboard import SummaryWriter
 from addict import Dict
 import numpy as np
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
+random.seed(41)
+np.random.seed(41)
+torch.manual_seed(41)
+torch.cuda.manual_seed(41)
+torch.cuda.manual_seed_all(41)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 warnings.filterwarnings("ignore")
 
 if __name__ == "__main__":
@@ -32,8 +36,8 @@ if __name__ == "__main__":
     class_name = conf.class_name
     run_name = conf.run_name
     processed_dir = data_dir
-    train_loader, val_loader = fetch_loaders(
-        processed_dir, conf.batch_size, conf.use_channels, conf.normalize, val_folder='val')
+    train_loader, val_loader, test_folder = fetch_loaders(
+        processed_dir, conf.batch_size, conf.use_channels, conf.normalize, val_folder='val', test_folder="test")
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)
     frame = Framework(
         loss_fn=loss_fn,
@@ -56,7 +60,7 @@ if __name__ == "__main__":
         frame.freeze_layers()
 
     if conf.find_lr:
-        fn.find_lr(frame, train_loader, init_value=1e-9, final_value=10)
+        fn.find_lr(frame, train_loader, init_value=1e-9, final_value=1)
         exit()
 
     # Setup logging
@@ -89,12 +93,16 @@ if __name__ == "__main__":
 
     for epoch in range(1, conf.epochs + 1):
         # train loop
-        loss_train, train_metric, loss_weights = fn.train_epoch(epoch, train_loader, frame, conf)
+        loss_train, train_metric, loss_alpha = fn.train_epoch(epoch, train_loader, frame, conf)
         fn.log_metrics(writer, train_metric, epoch, "train", conf.log_opts.mask_names)
 
         # validation loop
         new_loss_val, val_metric = fn.validate(epoch, val_loader, frame, conf)
         fn.log_metrics(writer, val_metric, epoch, "val", conf.log_opts.mask_names)
+
+        # test loop
+        loss_test, test_metric = fn.validate(epoch, val_loader, frame, conf, test=True)
+        fn.log_metrics(writer, test_metric, epoch, "test", conf.log_opts.mask_names)
 
         if (epoch - 1) % 5 == 0:
             fn.log_images( writer, frame, train_loader, epoch, "train", conf.threshold, conf.normalize, _normalize)
@@ -106,11 +114,14 @@ if __name__ == "__main__":
             loss_val = float(new_loss_val)
 
         lr = fn.get_current_lr(frame)
-        writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val}, epoch)
+        writer.add_scalars("Loss", {"train": loss_train, "val": new_loss_val, "test": loss_test}, epoch)
 
         writer.add_scalar("lr", lr, epoch)
+        #writer.add_scalar("alpha", loss_alpha, epoch)
+        writer.add_scalar("sigma/1", loss_alpha[0], epoch)
+        writer.add_scalar("sigma/2", loss_alpha[1], epoch)
 
-        fn.print_metrics(conf, train_metric, val_metric)
+        fn.print_metrics(conf, train_metric, val_metric, test_metric)
         torch.cuda.empty_cache()
         writer.flush()
         gc.collect()

@@ -25,11 +25,10 @@ saved_df = pd.DataFrame(columns=["Landsat ID", "Image", "Slice", "Background",
 
 images = sorted(os.listdir(Path(conf.image_dir)))
 idx = np.random.permutation(len(images))
-
 splits = {
-    'test'  : images[:int(conf.test*len(images))],
-    'val'   : images[int(conf.test*len(images)):int((conf.test+conf.val)*len(images))],
-    'train' : images[int((conf.test+conf.val)*len(images)):]
+    'test'  : sorted([images[i] for i in idx[:int(conf.test*len(images))]]),
+    'val'   : sorted([images[i] for i in idx[int(conf.test*len(images)):int((conf.test+conf.val)*len(images))]]),
+    'train' : sorted([images[i] for i in idx[int((conf.test+conf.val)*len(images)):]])
 }
 labels = fn.read_shp(Path(conf.labels_dir) / "HKH_CIDC_5basins_all.shp")
 fn.remove_and_create(conf.out_dir)

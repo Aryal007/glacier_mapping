@@ -9,6 +9,7 @@ metrics
 """
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 import pdb
 from torchvision.ops import sigmoid_focal_loss
 import numpy as np
@@ -31,11 +32,7 @@ class diceloss(torch.nn.Module):
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
-            mask = torch.ones(
-                (target.size()[0],
-                 target.size()[2],
-                 target.size()[3]),
-                dtype=torch.bool)
+            mask = torch.ones((target.size()[0], target.size()[2], target.size()[3]), dtype=torch.bool)
 
         if self.gaussian_blur_sigma != 'None':
             _target = np.zeros_like(target.cpu())
@@ -44,8 +41,6 @@ class diceloss(torch.nn.Module):
                     _target[i, j, :, :] = gaussian(
                         target[i, j, :, :].cpu(), self.gaussian_blur_sigma)
             target = torch.from_numpy(_target).to(mask.device)
-        
-        boundary_target, boundary_pred = self.boundary(pred, target)
 
         target = target * (1 - self.label_smoothing) + \
             self.label_smoothing / self.outchannels
@@ -55,45 +50,72 @@ class diceloss(torch.nn.Module):
         
         dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (
             pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
-        #dice_boundary = 1 - ((2.0 * (boundary_pred * boundary_target)[mask].sum(dim=0) + self.smooth) / (
-        #    boundary_pred[mask].sum(dim=0) + boundary_target[mask].sum(dim=0) + self.smooth))
-        #dice_boundary = dice_boundary[1]
-        #ce_boundary = torch.nn.CrossEntropyLoss()(pred, torch.argmax(target, dim=1).long())/6
 
-        return dice
+        dice = dice*torch.tensor([0.0, 1.0]).to(dice.device)
 
-    def boundary(self, gen_frames, gt_frames):
-        def gradient(x):
-            # idea from tf.image.image_gradients(image)
-            # https://github.com/tensorflow/tensorflow/blob/r2.1/tensorflow/python/ops/image_ops_impl.py#L3441-L3512
-            # x: (b,c,h,w), float32 or float64
-            # dx, dy: (b,c,h,w)
+        return dice.sum()
 
-            h_x = x.size()[-2]
-            w_x = x.size()[-1]
-            # gradient step=1
-            left = x
-            right = F.pad(x, [0, 1, 0, 0])[:, :, :, 1:]
-            top = x
-            bottom = F.pad(x, [0, 0, 0, 1])[:, :, 1:, :]
+class boundaryloss(nn.Module):
+    """Boundary Loss proposed in:
+    Alexey Bokhovkin et al., Boundary Loss for Remote Sensing Imagery Semantic Segmentation
+    https://arxiv.org/abs/1905.07852
+    """
 
-            # dx, dy = torch.abs(right - left), torch.abs(bottom - top)
-            dx, dy = right - left, bottom - top 
-            # dx will always have zeros in the last column, right-left
-            # dy will always have zeros in the last row,    bottom-top
-            dx[:, :, :, -1] = 0
-            dy[:, :, -1, :] = 0
+    def __init__(self, theta0=3, theta=5):
+        super().__init__()
 
-            return dx, dy
+        self.theta0 = theta0
+        self.theta = theta
 
-        # gradient
-        gen_dx, gen_dy = gradient(gen_frames)
-        gt_dx, gt_dy = gradient(gt_frames)
+    def forward(self, pred, one_hot_gt):
+        """
+        Input:
+            - pred: the output from model (before softmax)
+                    shape (N, C, H, W)
+            - gt: ground truth map
+                    shape (N, C, H, w)
+        Return:
+            - boundary loss, averaged over mini-batch
+        """
 
-        boundary_gt = torch.sqrt(gt_dx**2+gt_dy**2)
-        boundary_gen = torch.sqrt(gen_dx**2+gen_dy**2)
+        n, c, _, _ = pred.shape
 
-        return boundary_gt.permute(0, 2, 3, 1), self.act(boundary_gen).permute(0, 2, 3, 1)
+        # softmax so that predicted map can be distributed in [0, 1]
+        pred = torch.softmax(pred, dim=1)
+
+        # boundary map
+        gt_b = F.max_pool2d(
+            1 - one_hot_gt, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
+        gt_b -= 1 - one_hot_gt
+
+        pred_b = F.max_pool2d(
+            1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
+        pred_b -= 1 - pred
+
+        # extended boundary map
+        gt_b_ext = F.max_pool2d(
+            gt_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+
+        pred_b_ext = F.max_pool2d(
+            pred_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+
+        # reshape
+        gt_b = gt_b.view(n, c, -1)
+        pred_b = pred_b.view(n, c, -1)
+        gt_b_ext = gt_b_ext.view(n, c, -1)
+        pred_b_ext = pred_b_ext.view(n, c, -1)
+
+        # Precision, Recall
+        P = torch.sum(pred_b * gt_b_ext, dim=2) / (torch.sum(pred_b, dim=2) + 1e-7)
+        R = torch.sum(pred_b_ext * gt_b, dim=2) / (torch.sum(gt_b, dim=2) + 1e-7)
+
+        # Boundary F1 Score
+        BF1 = 2 * P * R / (P + R + 1e-7)
+
+        # summing BF1 Score for each class and average over mini-batch
+        loss = torch.mean(1 - BF1)
+
+        return loss
 
 class iouloss(torch.nn.Module):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1, label_smoothing=0, masked=False):
@@ -138,13 +160,7 @@ class celoss(torch.nn.Module):
 
 
 class nllloss(torch.nn.Module):
-    def __init__(
-            self,
-            act=torch.nn.Sigmoid(),
-            smooth=1.0,
-            outchannels=1,
-            label_smoothing=0,
-            masked=False):
+    def __init__(self,act=torch.nn.Sigmoid(),smooth=1.0,outchannels=1,label_smoothing=0,masked=False):
         super().__init__()
         self.act = act
         self.smooth = smooth
@@ -176,14 +192,7 @@ class nllloss(torch.nn.Module):
 
 
 class focalloss(torch.nn.modules.loss._WeightedLoss):
-    def __init__(
-            self,
-            act=torch.nn.Sigmoid(),
-            smooth=1.0,
-            outchannels=1,
-            label_smoothing=0,
-            masked=False,
-            gamma=2):
+    def __init__(self):
         super().__init__()
 
     def forward(self, pred, target):
@@ -194,25 +203,51 @@ class focalloss(torch.nn.modules.loss._WeightedLoss):
 
 class customloss(torch.nn.modules.loss._WeightedLoss):
     def __init__(self, act=torch.nn.Sigmoid(), smooth=1.0, outchannels=1,
-            label_smoothing=0, masked=False, gamma=2):
+            label_smoothing=0, masked=True, theta0=3, theta=5):
         super().__init__()
         self.act = act
         self.smooth = smooth
         self.outchannels = outchannels
         self.label_smoothing = label_smoothing
         self.masked = masked
+        self.theta0 = theta0
+        self.theta = theta
 
     def forward(self, pred, target):
         if self.masked:
             mask = torch.sum(target, dim=1) == 1
         else:
             mask = torch.ones((target.size()[0], target.size()[2], target.size()[3]), dtype=torch.bool)
-        target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
-        pred = self.act(pred).permute(0, 2, 3, 1)
-        ce = torch.nn.CrossEntropyLoss(ignore_index=0)(pred[mask], torch.argmax(target, dim=1).long()[mask])
-        target = target.permute(0, 2, 3, 1)
-        intersection = (pred * target)[mask].sum(dim=0)
-        union = pred[mask].sum(dim=0) + target[mask].sum(dim=0) - intersection
-        iou = 1 - ((intersection + self.smooth) / (union + self.smooth))
 
-        return iou + ce/2
+        #target = target * (1 - self.label_smoothing) + self.label_smoothing / self.outchannels
+        
+        n, c, _, _ = pred.shape
+        # softmax so that predicted map can be distributed in [0, 1]
+        pred = self.act(pred)
+        # boundary map
+        gt_b = F.max_pool2d(1 - target, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
+        gt_b -= 1 - target
+        pred_b = F.max_pool2d(1 - pred, kernel_size=self.theta0, stride=1, padding=(self.theta0 - 1) // 2)
+        pred_b -= 1 - pred
+        # extended boundary map
+        gt_b_ext = F.max_pool2d(gt_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+        pred_b_ext = F.max_pool2d(pred_b, kernel_size=self.theta, stride=1, padding=(self.theta - 1) // 2)
+        # reshape
+        gt_b = gt_b.view(n, c, -1)
+        pred_b = pred_b.view(n, c, -1)
+        gt_b_ext = gt_b_ext.view(n, c, -1)
+        pred_b_ext = pred_b_ext.view(n, c, -1)
+        # Precision, Recall
+        P = torch.sum(pred_b * gt_b_ext, dim=2) / (torch.sum(pred_b, dim=2) + 1e-7)
+        R = torch.sum(pred_b_ext * gt_b, dim=2) / (torch.sum(gt_b, dim=2) + 1e-7)
+        # Boundary F1 Score
+        BF1 = 2 * P * R / (P + R + 1e-7)
+        # summing BF1 Score for each class and average over mini-batch
+        boundaryloss = torch.mean(1 - BF1)
+
+        pred = pred.permute(0, 2, 3, 1)
+        target = target.permute(0, 2, 3, 1)
+        diceloss = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
+        diceloss = diceloss*torch.tensor([0.0, 1.0]).to(diceloss.device)
+        
+        return diceloss, boundaryloss

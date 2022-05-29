@@ -5,19 +5,14 @@ Created on Wed Feb 17 13:24:56 2021
 
 @author: mibook
 """
-import glob
-import os
-import pdb
-import gc
+import glob, os, random, torch, elasticdeform
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
-import random
-import torch
-import elasticdeform
 from torchvision import transforms
+import pdb
 
 
-def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False, train_folder='train', val_folder='val', test_folder='', shuffle=True):
+def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False, train_folder='train', val_folder='val', test_folder='test', shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
     Args:
         processed_dir(str): Directory with the processed data
@@ -28,13 +23,14 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=Fa
     train_dataset = GlacierDataset(processed_dir / train_folder, use_channels, normalize,
                                    transforms=transforms.Compose([
                                        #DropoutChannels(0.5),
-                                       FlipHorizontal(0.5),
-                                       FlipVertical(0.5),
-                                       Rot270(0.5),
-                                       ElasticDeform(0.5)
-                                   ])
-                                   )
+                                       FlipHorizontal(0.15),
+                                       FlipVertical(0.15),
+                                       Rot270(0.15),
+                                       #ElasticDeform(1)
+                                    ])
+                                    )
     val_dataset = GlacierDataset(processed_dir / val_folder, use_channels, normalize)
+    test_dataset = GlacierDataset(processed_dir / test_folder, use_channels, normalize)
 
     def seed_worker(worker_id):
         worker_seed = torch.initial_seed() % 2**32
@@ -50,7 +46,10 @@ def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=Fa
     val_loader = DataLoader(val_dataset, batch_size=batch_size,
                             worker_init_fn=seed_worker, generator=g,
                             num_workers=8, shuffle=shuffle)
-    return train_loader, val_loader
+    test_loader = DataLoader(test_dataset, batch_size=batch_size,
+                            worker_init_fn=seed_worker, generator=g,
+                            num_workers=8, shuffle=False)
+    return train_loader, val_loader, test_loader
 
 
 class GlacierDataset(Dataset):
@@ -75,8 +74,6 @@ class GlacierDataset(Dataset):
             self.min, self.max = arr[2][use_channels], arr[3][use_channels]
         if self.normalize == "mean-std":
             self.mean, self.std = arr[0], arr[1]
-            self.mean = np.append(self.mean, 0)
-            self.std = np.append(self.std, 1)
             self.mean, self.std = self.mean[use_channels], self.std[use_channels]
 
     def __getitem__(self, index):
@@ -108,7 +105,6 @@ class GlacierDataset(Dataset):
             sample = self.transforms(sample)
             data = torch.from_numpy(sample['image'].copy()).float()
             label = torch.from_numpy(sample['mask'].copy()).float()
-            del(sample)
         else:
             data = torch.from_numpy(data).float()
             label = torch.from_numpy(label).float()
@@ -195,7 +191,7 @@ class DropoutChannels(object):
     def __call__(self, sample):
         data, label = sample['image'], sample['mask']
         if torch.rand(1) < self.p:
-            rand_channel_index = np.random.randint(low=0, high=data.shape[2], size=int(data.shape[2]/2))
+            rand_channel_index = np.random.randint(low=0, high=data.shape[2], size=int(data.shape[2]/5))
             data[:, :, rand_channel_index] = 0
         return {'image': data, 'mask': label}
 

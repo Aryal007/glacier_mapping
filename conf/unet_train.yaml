@@ -1,34 +1,35 @@
-data_dir: "/data/baryal/HKH/processed_L07_2005_cleanice"
-gpu_rank: 0
-class_name: ["Clean Ice"]
+data_dir: "/data/baryal/HKH/processed_L07_2005_debris"
+gpu_rank: 1
+class_name: ["Debris"]
 threshold: [0.5, 0.5]
 batch_size: 8
-run_name: "5_l07_sea_rsi"
-epochs: 581
+run_name: "4_top_1"
+epochs: 251
 save_every: None
-use_channels: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+use_channels: [14]
 normalize: "mean-std"
 loss_opts:
-  name: "dice"
+  name: "custom"
   masked: True
-  weights: [1.0, 1.0]
-  gaussian_blur_sigma: 2
-  label_smoothing: 0
+  weights: [1.0]
+  gaussian_blur_sigma: None
+  label_smoothing: 0.1
+  alpha: 0.1
 model_opts:
   args:
-    inchannels: 14
+    inchannels: 1
     outchannels: 2
     net_depth: 4
-    dropout: 0.2
+    dropout: 0.1
     spatial: True
     first_channel_output: 32
 optim_opts:
   name: "Adam"
   args:
-    lr: 0.001
+    lr: 0.0003
 log_opts:
-  mask_names: ["Background", "Clean Ice"]
+  mask_names: ["Background", "Debris"]
 metrics_opts: ["IoU", "precision", "recall"]
 fine_tune: False
-comment: "SEA + RSI Image"
+comment: "L07"
 find_lr: False

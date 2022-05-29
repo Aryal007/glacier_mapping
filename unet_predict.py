@@ -31,16 +31,16 @@ if __name__ == "__main__":
     debris_model_path = data_dir / conf.debris_processed_dir / conf.folder_name / \
         conf.run_name / "models" / "model_best.pt"
 
-    loss_fn = fn.get_loss(conf.model_opts.args.outchannels)
+    loss_fn = fn.get_loss(conf.model_opts_cleanice.args.outchannels)
     cleanice_frame = Framework(
         loss_fn=loss_fn,
-        model_opts=conf.model_opts,
+        model_opts=conf.model_opts_cleanice,
         optimizer_opts=conf.optim_opts,
         device=(int(conf.gpu_rank))
     )
     debris_frame = Framework(
         loss_fn=loss_fn,
-        model_opts=conf.model_opts,
+        model_opts=conf.model_opts_debris,
         optimizer_opts=conf.optim_opts,
         device=(int(conf.gpu_rank))
     )
@@ -55,9 +55,9 @@ if __name__ == "__main__":
 
     arr = np.load(data_dir / conf.cleanice_processed_dir / "normalize_train.npy")
     if conf.normalize == "mean-std":
-        _mean, _std = arr[0][conf.use_channels], arr[1][conf.use_channels]
+        _mean, _std = arr[0], arr[1]
     if conf.normalize == "min-max":
-        _min, _max = arr[2][conf.use_channels], arr[3][conf.use_channels]
+        _min, _max = arr[2], arr[3]
 
     files = os.listdir(data_dir / conf.cleanice_processed_dir / "test")
     inputs = [x for x in files if "tiff" in x]
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     debris_tp_sum, debris_fp_sum, debris_fn_sum = 0, 0, 0
 
     for x_fname in inputs:
-        x = np.load(data_dir / conf.cleanice_processed_dir / "test" / x_fname)[:,:,conf.use_channels]
+        x = np.load(data_dir / conf.cleanice_processed_dir / "test" / x_fname)
         mask = np.sum(x, axis=2) == 0
         if conf.normalize == "mean-std":
             x = (x - _mean) / _std
@@ -77,13 +77,14 @@ if __name__ == "__main__":
         save_fname = x_fname.replace("tiff", "pred")
         y_cleanice_true = np.load(data_dir / conf.cleanice_processed_dir / "test" / y_fname) + 1
         y_debris_true = np.load(data_dir / conf.debris_processed_dir / "test" / y_fname) + 1
-        y_cleanice_true[mask], y_debris_true[mask] = 0, 0
+        y_cleanice_true, y_debris_true = y_cleanice_true[~mask], y_debris_true[~mask]
 
-        x = torch.from_numpy(np.expand_dims(x, axis=0)).float()
-        pred_cleanice = cleanice_frame.infer(x)
+        _x = torch.from_numpy(np.expand_dims(x[:,:,conf.use_channels_cleanice], axis=0)).float()
+        pred_cleanice = cleanice_frame.infer(_x)
         pred_cleanice = torch.nn.Softmax(3)(pred_cleanice)
         pred_cleanice = np.squeeze(pred_cleanice.cpu())
-        pred_debris = debris_frame.infer(x)
+        _x = torch.from_numpy(np.expand_dims(x[:,:,conf.use_channels_debris], axis=0)).float()
+        pred_debris = debris_frame.infer(_x)
         pred_debris = torch.nn.Softmax(3)(pred_debris)
         pred_debris = np.squeeze(pred_debris.cpu())
         _pred = np.zeros((pred_debris.shape[0], pred_debris.shape[1]))
@@ -97,8 +98,9 @@ if __name__ == "__main__":
         y_pred_prob[:,:,2] = pred_debris[:, :, 1]
         y_pred_prob[:,:,0] = np.min(np.concatenate((pred_cleanice[:, :, 0][:,:, None], pred_debris[:, :, 0][:,:,None]), axis=2), axis=2)
         y_pred_prob[mask] = 0
-        ci_pred, debris_pred = y_pred == 2, y_pred == 3
-        ci_true, debris_true = y_cleanice_true == 2, y_debris_true == 2
+        y_pred = y_pred[~mask]
+        ci_pred, debris_pred = (y_pred == 2).astype(np.int8), (y_pred == 3).astype(np.int8)
+        ci_true, debris_true = (y_cleanice_true == 2).astype(np.int8), (y_debris_true == 2).astype(np.int8)
         ci_tp, ci_fp, ci_fn = get_tp_fp_fn(ci_pred, ci_true)
         debris_tp, debris_fp, debris_fn = get_tp_fp_fn(debris_pred, debris_true)
         ci_precision, ci_recall, ci_iou = get_precision_recall_iou(ci_tp, ci_fp, ci_fn)

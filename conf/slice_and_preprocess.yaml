@@ -11,5 +11,6 @@ add_ndvi: True
 add_ndwi: True
 add_ndsi: True
 add_hsv: True
-bands: ["B1", "B2", "B3", "B4", "B5", "B6_VCID1", "B6_VCID2", "B7", "elevation", "slope", "aspect_sin", "aspect_cos"]
-use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+bands: ["B1", "B2", "B3", "B4", "B5", "B6_VCID1", "B6_VCID2", "B7", "elevation", 
+        "slope_aspect_sin", "slope_aspect_cos", "curvature", "lat", "lon"]
+use_bands: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]

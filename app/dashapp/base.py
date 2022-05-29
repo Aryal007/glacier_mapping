@@ -7,7 +7,7 @@ class Base():
         self.data_dir = Path("/data/baryal/HKH/")
         self.processed_folder = "processed_L07_2005"
         self.processed_dir = self.data_dir / self.processed_folder
-        self.preds_folder = "2_l07"
+        self.preds_folder = "3_l07_slba_abs"
         self.preds_dir = self.data_dir / self.processed_folder / "preds" / self.preds_folder
 
     def get_df(self):
