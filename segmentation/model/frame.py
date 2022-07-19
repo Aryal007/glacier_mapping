@@ -18,7 +18,7 @@ import os, torch, math, random
 import pdb
 from tqdm import tqdm
 from pathlib import Path
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CyclicLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 class Framework:
     """
@@ -42,7 +42,6 @@ class Framework:
             self.loss_alpha = torch.tensor([loss_opts.alpha]).to(self.device)
         else:
             self.loss_alpha = torch.tensor([0.0]).to(self.device)
-        self.k = 1
         self.sigma1, self.sigma2 = torch.tensor([1.0]).to(self.device), torch.tensor([1.0]).to(self.device)
         self.sigma1, self.sigma2 = self.sigma1.requires_grad_(), self.sigma2.requires_grad_()
         #self.loss_alpha = self.loss_alpha.requires_grad_()
@@ -62,15 +61,6 @@ class Framework:
                                              patience=15,
                                              factor=0.1,
                                              min_lr=1e-9)
-        #self.lrscheduler2 = CyclicLR(
-        #    self.optimizer,
-        #    base_lr=optimizer_opts["args"]["lr"] * 0.001,
-        #    max_lr=optimizer_opts["args"]["lr"],
-        #    mode='triangular2',
-        #    step_size_up=30,
-        #    verbose=True,
-        #    cycle_momentum=False)
-        #self.lrscheduler2 = ExponentialLR(self.optimizer, 0.795, verbose=True)
         self.reg_opts = reg_opts
 
     def optimize(self, x, y):
@@ -104,7 +94,6 @@ class Framework:
         """
         Update the LR Scheduler
         """
-        #self.lrscheduler2.step()
         self.lrscheduler.step(val_loss)
 
     def save(self, out_dir, epoch):
@@ -147,7 +136,7 @@ class Framework:
         y = y.to(self.device)
         #loss = self.loss_fn(y_hat, y)
         diceloss, boundaryloss = self.loss_fn(y_hat, y)
-        diceloss = diceloss.sum() * self.k
+        diceloss = diceloss.sum()
         #loss = torch.add(torch.mul(diceloss.clone(), self.loss_alpha), torch.mul(boundaryloss.clone(), (1-self.loss_alpha)))
         loss = torch.add(
                 torch.add(

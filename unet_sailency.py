@@ -8,9 +8,10 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    channels = ["B1", "B2", "B3", "B4", "B5", "B6_VCID1", "B6_VCID2", "B7", "elevation", 
-        "slope * sin(aspect)", "slope * cos(aspect)", "curvature", "latitude", "longitude",
-        "NDVI", "NDWI", "NDSI", "Hue", "Saturation", "Value"]
+    channels = ["B1", "B2", "B3", "B4", "B5", "B6_VCID1", "B6_VCID2", "B7"]
+        #"elevation", 
+        #"slope * sin(aspect)", "slope * cos(aspect)", "curvature", "latitude", "longitude",
+        #"NDVI", "NDWI", "NDSI", "Hue", "Saturation", "Value"]
     conf = Dict(yaml.safe_load(open('./conf/unet_sailency.yaml')))
     data_dir = pathlib.Path(conf.data_dir)
     sailency_dir = data_dir / conf.processed_dir / "sailency" / conf.run_name
@@ -41,7 +42,6 @@ if __name__ == "__main__":
     files = sorted(os.listdir(data_dir / conf.processed_dir / conf.split))
     inputs = [x for x in files if "tiff" in x]
     
-    '''
     sums = []
     for x_fname in inputs:
         x = np.load(data_dir / conf.processed_dir / conf.split / x_fname)[:,:,conf.use_channels]
@@ -69,7 +69,6 @@ if __name__ == "__main__":
     scores = dict(sorted(scores.items(), key=lambda item: item[1]))
     print(scores)
     pdb.set_trace()
-    '''
     
     #_y = y
     #plt.imshow(_y.detach().cpu().numpy()[0,:,:,1])

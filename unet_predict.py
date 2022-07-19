@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from segmentation.model.metrics import *
 import segmentation.data.slice as sl
+from scipy.ndimage.morphology import binary_fill_holes
 
 def get_tp_fp_fn(pred, true):
     pred, true = torch.from_numpy(pred), torch.from_numpy(true)
@@ -88,8 +89,12 @@ if __name__ == "__main__":
         pred_debris = torch.nn.Softmax(3)(pred_debris)
         pred_debris = np.squeeze(pred_debris.cpu())
         _pred = np.zeros((pred_debris.shape[0], pred_debris.shape[1]))
-        _pred[pred_cleanice[:, :, 1] >= conf.threshold[0]] = 1
-        _pred[pred_debris[:, :, 1] >= conf.threshold[1]] = 2
+        _ci = pred_cleanice[:, :, 1] >= conf.threshold[0]
+        _ci = binary_fill_holes(_ci)
+        _debris = pred_debris[:, :, 1] >= conf.threshold[1]
+        _debris = binary_fill_holes(_debris)
+        _pred[_ci] = 1
+        _pred[_debris] = 2
         _pred = _pred+1
         _pred[mask] = 0
         y_pred = _pred
