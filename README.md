@@ -91,3 +91,5 @@ HKH
 └─── processed                        Location to store train, test, val directories, normalize array and slices metadata. Created during slice_and_preprocess
     └───runs                          Location to store U-Net training runs. Created during unet_train.py
 ```
+
+Some code in this repository is taken from one of our earlier project at: https://github.com/krisrs1128/glacier_mapping
