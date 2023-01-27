@@ -1,5 +1,22 @@
-# Glacier Mapping
-## _Estimate clean ice and debris glaciers boundaries in the HKH_
+# Glacier Segmentation
+## _Boundary Aware U-Net for Glacier Segmentation_
+
+Large-scale  study  of  glaciers  improves  our  under-standing  of  global  glacier  change  and  is  impera-tive for monitoring the ecological environment, pre-venting disasters, and studying the effects of globalclimate  change.   Glaciers  in  the  Hindu  Kush  Hi-malaya  (HKH)  are  particularly  interesting  as  theHKH  is  one  of  the  world’s  most  sensitive  regionsfor climate change.  In this work, we:  (1) propose amodified version of the U-Net for large-scale, spa-tially non-overlapping, clean glacial ice, and debris-covered  glacial  ice  segmentation;   (2)  introducea  novel  self-learning  boundary-aware  loss  to  im-prove debris-covered glacial ice segmentation per-formance;  and (3) propose a feature-wise saliencyscore  to  understand  the  contribution  of  each  fea-ture  in  the  multispectral  Landsat  7  imagery  forglacier mapping.  Our results show that the debris-covered glacial ice segmentation model trained us-ing self-learning boundary-aware loss outperformedthe model trained using dice loss.  Furthermore, weconclude  that  red,  shortwave  infrared,  and  near-infrared  bands  have  the  highest  contribution  to-ward debris-covered glacial ice segmentation fromLandsat 7 images.
+
+Full Paper available at: https://doi.org/10.7557/18.6789
+
+## Reference
+
+```
+@article{aryal2023boundary,
+  title={Boundary Aware {U}-{N}et for Glacier Segmentation},
+  author={Aryal, Bibek and Miles, Katie E. and Zesati, Sergio A. Vargas and Fuentes, Olac},
+  booktitle={Proceedings of the Northern Lights Deep Learning Workshop},
+  volume={4},
+  year={2023},
+  doi={https://doi.org/10.7557/18.6789}
+}
+```
 
 ## Project Structure
 ```
@@ -92,4 +109,7 @@ HKH
     └───runs                          Location to store U-Net training runs. Created during unet_train.py
 ```
 
-Some code in this repository is taken from one of our earlier project at: https://github.com/krisrs1128/glacier_mapping
+## Related Project: 
+```
+https://github.com/krisrs1128/glacier_mapping
+```
