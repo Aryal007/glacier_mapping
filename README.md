@@ -11,7 +11,7 @@ Full Paper available at: https://doi.org/10.7557/18.6789
 @article{aryal2023boundary,
   title={Boundary Aware {U}-{N}et for Glacier Segmentation},
   author={Aryal, Bibek and Miles, Katie E. and Zesati, Sergio A. Vargas and Fuentes, Olac},
-  booktitle={Proceedings of the Northern Lights Deep Learning Workshop},
+  journal={Proceedings of the Northern Lights Deep Learning Workshop},
   volume={4},
   year={2023},
   doi={https://doi.org/10.7557/18.6789}
