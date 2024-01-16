@@ -37,7 +37,7 @@ if __name__ == "__main__":
     run_name = conf.run_name
     processed_dir = data_dir
     train_loader, val_loader, test_folder = fetch_loaders(
-        processed_dir, conf.batch_size, conf.use_channels, conf.normalize, val_folder='val', test_folder="test")
+        processed_dir, conf.batch_size, conf.use_channels, conf.normalize)
     loss_fn = fn.get_loss(conf.model_opts.args.outchannels, conf.loss_opts)
     frame = Framework(
         loss_fn=loss_fn,
@@ -105,9 +105,10 @@ if __name__ == "__main__":
         fn.log_metrics(writer, test_metric, epoch, "test", conf.log_opts.mask_names)
 
         if (epoch - 1) % 5 == 0:
-            fn.log_images( writer, frame, train_loader, epoch, "train", conf.threshold, conf.normalize, _normalize)
-            fn.log_images(writer, frame, val_loader, epoch, "val", conf.threshold, conf.normalize, _normalize)
-
+            #fn.log_images( writer, frame, train_loader, epoch, "train", conf.threshold, conf.normalize, _normalize)
+            #fn.log_images(writer, frame, val_loader, epoch, "val", conf.threshold, conf.normalize, _normalize)
+            pass
+        
         # Save best model
         if new_loss_val < loss_val:
             frame.save(out_dir, "best")

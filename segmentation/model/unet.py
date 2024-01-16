@@ -12,6 +12,7 @@ This code holds the defination for u-net model
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pdb
 
 class ConvBlock(nn.Module):
     """
@@ -55,9 +56,10 @@ class UpBlock(nn.Module):
 
     def forward(self, x, skips):
         x = self.upconv(x)
+        if x.shape!=skips.shape:
+            x = F.pad(x, (0,1,1,0))
         x = torch.cat([skips, x], 1)
         return self.conv(x)
-
 
 class Unet(nn.Module):
     """

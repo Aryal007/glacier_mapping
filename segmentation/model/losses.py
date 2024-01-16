@@ -51,7 +51,7 @@ class diceloss(torch.nn.Module):
         dice = 1 - ((2.0 * (pred * target)[mask].sum(dim=0) + self.smooth) / (
             pred[mask].sum(dim=0) + target[mask].sum(dim=0) + self.smooth))
 
-        dice = dice*torch.tensor([0.0, 1.0]).to(dice.device)
+        dice = dice*torch.tensor([0.95, 0.05]).to(dice.device)
 
         return dice.sum()
 

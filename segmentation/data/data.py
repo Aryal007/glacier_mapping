@@ -5,55 +5,45 @@ Created on Wed Feb 17 13:24:56 2021
 
 @author: mibook
 """
-import glob, os, random, torch, elasticdeform
+import glob, os, random, torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from torchvision import transforms
+import rasterio
 import pdb
 
-
-def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False, train_folder='train', val_folder='val', test_folder='test', shuffle=True):
+def fetch_loaders(processed_dir, batch_size=32, use_channels=[0,1], normalize=False, train_folder='train_satellite', shuffle=True):
     """ Function to fetch dataLoaders for the Training / Validation
     Args:
         processed_dir(str): Directory with the processed data
         batch_size(int): The size of each batch during training. Defaults to 32.
     Return:
-        Returns train and val dataloaders
+        Returns train and test dataloaders
     """
-    train_dataset = GlacierDataset(processed_dir / train_folder, use_channels, normalize,
+    dataset = KelpDataset(processed_dir / train_folder, use_channels, normalize,
                                    transforms=transforms.Compose([
-                                       #DropoutChannels(0.5),
                                        FlipHorizontal(0.15),
                                        FlipVertical(0.15),
                                        Rot270(0.15),
-                                       #ElasticDeform(1)
                                     ])
                                     )
-    val_dataset = GlacierDataset(processed_dir / val_folder, use_channels, normalize)
-    test_dataset = GlacierDataset(processed_dir / test_folder, use_channels, normalize)
+    
+    n_data = len(dataset)
+    val_split, test_split = 0.2, 0.2
+    n_test = int(n_data*test_split)
+    n_val = int(n_data*val_split)
+    n_train = n_data-n_test-n_val
 
-    def seed_worker(worker_id):
-        worker_seed = torch.initial_seed() % 2**32
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(dataset, [n_train, n_val, n_test])
 
-    g = torch.Generator()
-    g.manual_seed(42)
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, 
-                              worker_init_fn=seed_worker, generator=g,
-                              num_workers=8, shuffle=shuffle)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                            worker_init_fn=seed_worker, generator=g,
-                            num_workers=8, shuffle=shuffle)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size,
-                            worker_init_fn=seed_worker, generator=g,
-                            num_workers=8, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, val_loader, test_loader
 
 
-class GlacierDataset(Dataset):
-    """Custom Dataset for Glacier Data
+class KelpDataset(Dataset):
+    """Custom Dataset for Kelp Data
     Indexing the i^th element returns the underlying image and the associated
     binary mask
     """
@@ -64,12 +54,33 @@ class GlacierDataset(Dataset):
             folder_path(str): A path to data directory
         """
 
-        self.img_files = glob.glob(os.path.join(folder_path, '*tiff*'))
-        self.mask_files = [s.replace("tiff", "mask") for s in self.img_files]
+        self.img_files = glob.glob(os.path.join(folder_path, '*tif*'))[:1000]
+        self.mask_files = [s.replace("satellite", "kelp") for s in self.img_files]
         self.use_channels = use_channels
         self.normalize = normalize
         self.transforms = transforms
-        arr = np.load(folder_path.parent / "normalize_train.npy")
+        try:
+            arr = np.load(folder_path.parent / "normalize_train.npy")
+        except:
+            print("Normalize train does not exist, computing")
+            samples = self.img_files[:100]
+            means, stds, mins, maxs = [], [], [], []
+            arr = []
+            for sample in samples:
+                x = rasterio.open(sample)
+                x_arr = x.read()
+                data = np.transpose(x_arr, (1,2,0))
+                means.append(np.mean(data, axis=(0,1)))
+                stds.append(np.std(data, axis=(0,1)))
+                mins.append(np.min(data, axis=(0,1)))
+                maxs.append(np.max(data, axis=(0,1)))
+            arr.append(np.mean(means, axis=0))
+            arr.append(np.mean(stds, axis=0))
+            arr.append(np.min(mins, axis=0))
+            arr.append(np.max(maxs, axis=0))
+            arr = np.asarray(arr)
+            print(arr.shape)
+            np.save(folder_path.parent / "normalize_train.npy", arr)
         if self.normalize == "min-max":
             self.min, self.max = arr[2][use_channels], arr[3][use_channels]
         if self.normalize == "mean-std":
@@ -83,9 +94,10 @@ class GlacierDataset(Dataset):
         Return:
             data(x) and corresponding label(y)
         """
-        data = np.load(self.img_files[index])
+        x = rasterio.open(self.img_files[index])
+        x_arr = x.read()
+        data = np.transpose(x_arr, (1,2,0))
         data = data[:, :, self.use_channels]
-        _mask = np.sum(data, axis=2) == 0
         if self.normalize == "min-max":
             data = np.clip(data, self.min, self.max)
             data = (data - self.min) / (self.max - self.min)
@@ -93,13 +105,10 @@ class GlacierDataset(Dataset):
             data = (data - self.mean) / self.std
         else:
             raise ValueError("normalize must be min-max or mean-std")
-        label = np.expand_dims(np.load(self.mask_files[index]), axis=2)
-        #ones = label == 1
-        #twos = label == 2
-        #zeros = np.invert(ones + twos)
-        #label = np.concatenate((zeros, ones, twos), axis=2)
-        label = np.concatenate((label == 0, label == 1), axis=2)
-        label[_mask] = 0
+        y = rasterio.open(self.mask_files[index])
+        pos = y.read(1)
+        neg = ~pos+2
+        label = np.concatenate((np.expand_dims(pos, axis=2),np.expand_dims(neg, axis=2)), axis=2)
         if self.transforms:
             sample = {'image': data, 'mask': label}
             sample = self.transforms(sample)

@@ -200,7 +200,7 @@ def log_images(writer, frame, batch, epoch, stage, threshold, normalize_name,  n
     else:
         x = torch.clamp(x, 0, 1)
     try:
-        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, [4, 3, 1]]))), epoch)
+        writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, [2,3,4]]))), epoch)
     except:
         try:
             writer.add_image(f"{stage}/x", make_grid(pm(squash(x[:, :, :, [0, 1, 2]]))), epoch)

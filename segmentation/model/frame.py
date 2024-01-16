@@ -134,17 +134,17 @@ class Framework:
         """
         y_hat = y_hat.to(self.device)
         y = y.to(self.device)
-        #loss = self.loss_fn(y_hat, y)
-        diceloss, boundaryloss = self.loss_fn(y_hat, y)
-        diceloss = diceloss.sum()
+        loss = self.loss_fn(y_hat, y)
+        #diceloss, boundaryloss = self.loss_fn(y_hat, y)
+        #diceloss = diceloss.sum()
         #loss = torch.add(torch.mul(diceloss.clone(), self.loss_alpha), torch.mul(boundaryloss.clone(), (1-self.loss_alpha)))
-        loss = torch.add(
-                torch.add(
-                    torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma1))), diceloss.clone()), 
-                    torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma2))), boundaryloss.clone())
-                    ),
-                torch.abs(torch.log(torch.mul(self.sigma1, self.sigma2)))
-                )
+        #loss = torch.add(
+        #        torch.add(
+        #            torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma1))), diceloss.clone()), 
+        #            torch.mul(torch.div(1, torch.mul(2, torch.square(self.sigma2))), boundaryloss.clone())
+        #            ),
+        #        torch.abs(torch.log(torch.mul(self.sigma1, self.sigma2)))
+        #        )
         if self.reg_opts:
             for reg_type in self.reg_opts.keys():
                 reg_fun = globals()[reg_type]
